@@ -24,8 +24,12 @@ export async function updateProfileAction(input: unknown): Promise<ActionResult>
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
   }
 
-  await updateProfile(session.user.id, parsed.data.name)
-  return { success: true }
+  try {
+    await updateProfile(session.user.id, parsed.data.name)
+    return { success: true }
+  } catch {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
 }
 
 export async function changePasswordAction(input: unknown): Promise<ActionResult> {

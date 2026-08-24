@@ -1,8 +1,10 @@
 import { auth } from "@/lib/auth/auth"
+import { findById } from "@/server/repositories/user-repository"
 
 export default async function DashboardPage() {
   const session = await auth()
-  const name = session?.user?.name ?? session?.user?.email ?? "there"
+  const user = session?.user?.id ? await findById(session.user.id) : null
+  const name = user?.name ?? user?.email ?? "there"
 
   return (
     <div>

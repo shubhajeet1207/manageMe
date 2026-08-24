@@ -33,7 +33,10 @@ export function LoginForm() {
       if (result.success) {
         const requested = searchParams.get("callbackUrl")
         const safeCallbackUrl =
-          requested && requested.startsWith("/") && !requested.startsWith("//")
+          requested &&
+          requested.startsWith("/") &&
+          !requested.startsWith("//") &&
+          !requested.includes("\\")
             ? requested
             : "/dashboard"
         router.push(safeCallbackUrl)
