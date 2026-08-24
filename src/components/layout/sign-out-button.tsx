@@ -10,7 +10,7 @@ export function SignOutButton() {
       }}
       className="w-full"
     >
-      <DropdownMenuItem render={<button type="submit" className="w-full text-left" />}>
+      <DropdownMenuItem nativeButton render={<button type="submit" className="w-full text-left" />}>
         Sign out
       </DropdownMenuItem>
     </form>
