@@ -25,5 +25,5 @@ for how it was built.
 
 ## Tech stack
 
-Next.js 15 · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Prisma ·
+Next.js 16 · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Prisma ·
 PostgreSQL · Auth.js v5 · Vitest · Playwright

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored shadcn/ui generated primitives - not hand-written business logic.
+    "src/components/ui/**",
+    "src/hooks/use-mobile.ts",
   ]),
 ]);
 

@@ -71,6 +71,7 @@ manageMe/
         topbar.tsx
         user-menu.tsx
         sign-out-button.tsx
+        sign-out-action.ts
       theme-provider.tsx
     server/
       services/
@@ -240,39 +241,31 @@ git commit -m "feat: install shadcn/ui, theming, and toast primitives"
 
 ### Task 3: Prisma setup with the User model
 
+**Ruling (recorded in the SDD ledger):** the installed Prisma major is **7.9.1** — the plan's Tech Stack line just says "Prisma" with no version pinned, and Prisma 7 changed how the client connects: `datasource db { url = env(...) }` in `schema.prisma` is now a hard validation error (`P1012`); the CLI reads its connection info from a new `prisma.config.ts` file instead, and the generated **Client's runtime** connects only via a driver adapter passed to the `PrismaClient` constructor — `prisma.config.ts` is CLI-only and is not consulted by `new PrismaClient()`. This was verified empirically (a real `$queryRaw` round-trip against the project's Neon database, through `@prisma/adapter-pg`, succeeded) before writing the steps below. The generator stays `prisma-client-js`, so the generated client still lives at `node_modules/@prisma/client` — every later task's `import { PrismaClient } from "@prisma/client"` / `import type { User } from "@prisma/client"` is unaffected and needs no change.
+
+**Already done by the controller (not this task's implementer — do not redo):** because this task's `.env` holds a live database credential, the controller ran these steps directly rather than passing the secret through a subagent dispatch:
+- `pnpm add -D prisma && pnpm add @prisma/client` (installed: `prisma@7.9.1`, `@prisma/client@7.9.1`)
+- `pnpm add @prisma/adapter-pg pg && pnpm add -D @types/pg`
+- `pnpm-workspace.yaml` gained an `onlyBuiltDependencies: ["@prisma/engines", prisma]` entry (pnpm 10 blocks package postinstall scripts by default; this approves the two Prisma needs)
+- `pnpm dlx prisma init --datasource-provider postgresql` — created `prisma/schema.prisma` and `prisma.config.ts`. `.env` already existed (controller-written, real Neon connection string) — `prisma init` detected that and left it untouched (confirmed: it printed `warn Prisma would have added DATABASE_URL but it already exists in .env`)
+
 **Files:**
-- Create: `prisma/schema.prisma`, `src/lib/db/prisma.ts`, `.env` (local only, gitignored), `.env.example`
-- Modify: `.gitignore` (ensure `.env` is ignored — create-next-app's default already covers this; verify)
+- Modify: `prisma/schema.prisma` (currently just an empty `generator`/`datasource` block from `prisma init` — add the `User` model)
+- Create: `src/lib/db/prisma.ts`, `.env.example`
+- Modify: `.gitignore` (verify `.env` is ignored — create-next-app's default already covers this)
 
 **Interfaces:**
 - Produces: `prisma` singleton export from `@/lib/db/prisma` (typed `PrismaClient`), a `User` table migrated into the Neon database.
 
-- [ ] **Step 1: Install Prisma**
+- [ ] **Step 1: Confirm the starting state**
 
-Run: `pnpm add -D prisma && pnpm add @prisma/client`
+Run: `cat prisma/schema.prisma && cat prisma.config.ts && grep -c DATABASE_URL .env`
+Expected: `schema.prisma` has an empty `generator client { provider = "prisma-client-js" }` / `datasource db { provider = "postgresql" }` (no `url` line — that's correct for Prisma 7, leave it out), `prisma.config.ts` exists and reads `process.env["DATABASE_URL"]`, and `.env` has exactly one `DATABASE_URL` line. Do not print `.env`'s contents in your report — its presence and line count is all you need to confirm.
 
-- [ ] **Step 2: Init Prisma**
+- [ ] **Step 2: Add the User model**
 
-Run: `pnpm dlx prisma init --datasource-provider postgresql`
-Expected: creates `prisma/schema.prisma` and `.env` with a `DATABASE_URL` placeholder.
-
-- [ ] **Step 3: Set the real connection string**
-
-Create a free Postgres project at Neon (or use an existing one) and copy its pooled connection string into `.env` as `DATABASE_URL="postgresql://...";` — this file is gitignored and never committed.
-
-- [ ] **Step 4: Define the User model**
-
-Replace the contents of `prisma/schema.prisma`:
+Add to `prisma/schema.prisma` (keep the existing `generator`/`datasource` blocks exactly as `prisma init` wrote them — do not add a `url` back into the `datasource` block, it will fail validation with error P1012):
 ```prisma
-generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 model User {
   id             String   @id @default(cuid())
   name           String?
@@ -284,28 +277,31 @@ model User {
 }
 ```
 
-- [ ] **Step 5: Run the migration**
+- [ ] **Step 3: Run the migration**
 
 Run: `pnpm dlx prisma migrate dev --name init`
-Expected: migration applies against the Neon database with no errors; `prisma/migrations/` gains a new folder.
+Expected: migration applies against the Neon database with no errors (the CLI reads the connection string from `prisma.config.ts`, which reads `process.env["DATABASE_URL"]` — no manual wiring needed); `prisma/migrations/` gains a new folder.
 
-- [ ] **Step 6: Create the Prisma client singleton**
+- [ ] **Step 4: Create the Prisma client singleton with the driver adapter**
 
 Create `src/lib/db/prisma.ts`:
 ```ts
+import { PrismaPg } from "@prisma/adapter-pg"
 import { PrismaClient } from "@prisma/client"
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient }
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient()
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+
+export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter })
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma
 }
 ```
-This avoids exhausting DB connections from Next.js dev-mode module reloads — a fresh `PrismaClient` per reload would otherwise leak connections.
+This avoids exhausting DB connections from Next.js dev-mode module reloads — a fresh `PrismaClient` per reload would otherwise leak connections. Prisma 7's client only connects through a driver adapter (`prisma.config.ts` is CLI-only, not read by the runtime client) — that's why `@prisma/adapter-pg` is required here even though `prisma.config.ts` also has a `DATABASE_URL` reference.
 
-- [ ] **Step 7: Write `.env.example`**
+- [ ] **Step 5: Write `.env.example`**
 
 Create `.env.example`:
 ```
@@ -314,17 +310,24 @@ AUTH_SECRET=""
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
-- [ ] **Step 8: Verify**
+- [ ] **Step 6: Verify**
 
-Run: `pnpm dlx prisma studio --browser none & sleep 2; kill %1` (or simply confirm no error opening it) — or more simply, run `pnpm dlx prisma validate`
+Run: `pnpm dlx prisma validate`
 Expected: `The schema at prisma/schema.prisma is valid 🚀`
 
-- [ ] **Step 9: Commit**
+Run: `echo "SELECT 1;" | pnpm dlx prisma db execute --stdin`
+Expected: `Script executed successfully.` — confirms the real Neon connection works (this uses `prisma.config.ts`'s connection info, exercising the same `DATABASE_URL` the Step 4 adapter also reads).
+
+Run: `pnpm build`
+Expected: succeeds — this compiles `src/lib/db/prisma.ts` and would catch a TypeScript error in the adapter wiring, though it won't exercise the runtime connection since nothing imports the singleton yet (that starts in Task 6).
+
+- [ ] **Step 7: Commit**
 
 ```bash
-git add prisma src/lib/db .env.example .gitignore
-git commit -m "feat: add Prisma with User model and Neon Postgres"
+git add prisma src/lib/db .env.example pnpm-workspace.yaml package.json pnpm-lock.yaml prisma.config.ts .gitignore
+git commit -m "feat: add Prisma 7 with driver adapter, User model, and Neon Postgres"
 ```
+(`pnpm-workspace.yaml`, `package.json`/`pnpm-lock.yaml`, and `prisma.config.ts` already exist from the controller's setup and `prisma init` — this commit captures them alongside your model/client-singleton work since they were never committed yet.)
 
 ---
 
@@ -586,8 +589,11 @@ git commit -m "feat: add Zod schemas for signup, login, profile, and password ch
 
 ### Task 6: User repository (integration-tested against the real dev DB)
 
+**Already done by the controller:** Vitest does not load `.env` automatically (confirmed empirically — `process.env.DATABASE_URL` was `undefined` inside a test run without it), so every DB-touching test from this task onward would fail with an undefined connection string. The controller added `dotenv` as a dev dependency and two lines to `vitest.config.ts` (`import { config } from "dotenv"` and a `config()` call before `defineConfig`) — confirmed via the existing 14 tests from Tasks 4-5 still passing afterward. This task's implementer does not need to touch `vitest.config.ts`.
+
 **Files:**
 - Create: `src/server/repositories/user-repository.ts`, `src/server/repositories/user-repository.test.ts`
+- Already modified (controller, see above): `vitest.config.ts`, `package.json`, `pnpm-lock.yaml` (uncommitted — fold into this task's commit)
 
 **Interfaces:**
 - Consumes: `prisma` from `@/lib/db/prisma` (Task 3).
@@ -1016,21 +1022,89 @@ git add src/lib/auth/auth.ts src/types/next-auth.d.ts src/app/api/auth
 git commit -m "feat: configure Auth.js v5 with Credentials provider"
 ```
 
+**Note:** Task 9 reopens and splits this file (`src/lib/auth/auth.config.ts` extracted, `auth.ts` updated to consume it) to fix an Edge Runtime incompatibility discovered while implementing middleware — see Task 9's ruling note. `handlers`/`signIn`/`signOut`/`auth`'s exported shape is unaffected.
+
 ---
 
 ### Task 9: Middleware for protected routes
 
+**Ruling (recorded in the SDD ledger, reopens Task 8's `auth.ts`):** the first implementation attempt hit a real, well-known Auth.js v5 limitation, confirmed empirically before writing the steps below. Next.js middleware runs in the **Edge Runtime**, which cannot bundle native Node modules. Task 8's `auth.ts` imports `verifyCredentials` → `verifyPassword` → `@node-rs/argon2` (a native module) through its Credentials provider, so importing `auth` from `@/lib/auth/auth` in middleware pulled that whole chain into the Edge bundle and crashed compilation (`Module not found: Can't resolve '@node-rs/argon2-wasm32-wasi'`). The documented fix is Auth.js's **split config** pattern: an edge-safe base config with no providers (just session strategy, pages, callbacks) that middleware uses to decode/verify the JWT cookie — middleware only needs to know "is there a valid session," never "verify these credentials" — and the full config (with the Credentials provider) stays in `auth.ts` for Server Actions/Route Handlers, which run in the Node runtime where native modules work fine.
+
+A second issue surfaced once the bundling crash was fixed: Next.js 16 deprecated the `middleware.ts` file convention in favor of `proxy.ts` (same API, same default-export/`config.matcher` shape — confirmed empirically: renaming was a drop-in swap, redirect behavior identical, deprecation warning gone). Since this project uses a `src/` directory, the file also has to live at `src/proxy.ts`, not the repo root — `middleware.ts` at the root never ran at all (silently — no compile error, it just wasn't picked up), which is a separate, sharper trap than the deprecation warning: a repo-root `middleware.ts` looks correct and produces no error, it just never executes.
+
+Both fixes were verified end-to-end before writing this: `curl` against `/dashboard` and `/settings/foo` both returned `302` to the correct `/login?callbackUrl=...` with no bundling error and no deprecation warning.
+
 **Files:**
-- Create: `middleware.ts` (repo root, next to `package.json`)
+- Create: `src/lib/auth/auth.config.ts`, `src/proxy.ts`
+- Modify: `src/lib/auth/auth.ts` (Task 8's file — split out the edge-safe base config)
 
 **Interfaces:**
-- Consumes: `auth` (Task 8).
+- Produces: `authConfig` (a `NextAuthConfig` with no providers) from `@/lib/auth/auth.config` — consumed by both `auth.ts` and `proxy.ts`.
+- `auth.ts`'s existing exports (`handlers`, `signIn`, `signOut`, `auth`) are unchanged in shape; only their construction changes to spread `authConfig` plus the Credentials provider.
 
-- [ ] **Step 1: Write the middleware**
+- [ ] **Step 1: Extract the edge-safe base config**
 
-Create `middleware.ts`:
+Create `src/lib/auth/auth.config.ts`:
 ```ts
-import { auth } from "@/lib/auth/auth"
+import type { NextAuthConfig } from "next-auth"
+
+export const authConfig = {
+  session: { strategy: "jwt" },
+  pages: { signIn: "/login" },
+  providers: [],
+  callbacks: {
+    jwt: async ({ token, user }) => {
+      if (user) token.sub = user.id
+      return token
+    },
+    session: async ({ session, token }) => {
+      if (token.sub) session.user.id = token.sub
+      return session
+    },
+  },
+} satisfies NextAuthConfig
+```
+
+- [ ] **Step 2: Update `auth.ts` to build on the shared config**
+
+Modify `src/lib/auth/auth.ts` to spread `authConfig` and add only the Credentials provider (the `session`/`pages`/`callbacks` blocks move to Step 1's file — do not duplicate them here):
+```ts
+import NextAuth from "next-auth"
+import Credentials from "next-auth/providers/credentials"
+import { verifyCredentials } from "@/server/services/auth-service"
+import { authConfig } from "./auth.config"
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
+  providers: [
+    Credentials({
+      credentials: {
+        email: { label: "Email" },
+        password: { label: "Password" },
+      },
+      authorize: async (credentials) => {
+        const email = credentials?.email
+        const password = credentials?.password
+        if (typeof email !== "string" || typeof password !== "string") {
+          return null
+        }
+        const user = await verifyCredentials(email, password)
+        if (!user) return null
+        return { id: user.id, name: user.name, email: user.email, image: user.image }
+      },
+    }),
+  ],
+})
+```
+
+- [ ] **Step 3: Write the edge-safe proxy (middleware)**
+
+Create `src/proxy.ts` (not `middleware.ts`, and not at the repo root — this project uses `src/`, and Next.js 16 renamed the convention from "middleware" to "proxy"):
+```ts
+import NextAuth from "next-auth"
+import { authConfig } from "@/lib/auth/auth.config"
+
+const { auth } = NextAuth(authConfig)
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
@@ -1049,17 +1123,22 @@ export const config = {
   matcher: ["/dashboard/:path*", "/settings/:path*"],
 }
 ```
+This file builds its own lightweight `NextAuth(authConfig)` instance (no providers) purely to decode the JWT session cookie — it never touches `verifyCredentials` or `@node-rs/argon2`, so it bundles cleanly for the Edge Runtime.
 
-- [ ] **Step 2: Verify**
+- [ ] **Step 4: Verify**
 
-Run: `pnpm dev` (background), then: `curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/dashboard`
-Expected: a redirect status (307/302) with `redirect_url` pointing to `/login?callbackUrl=%2Fdashboard`. Stop the dev server.
+Run: `pnpm dev` (background). Then:
+```bash
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/dashboard
+curl -s -o /dev/null -w "%{http_code} %{redirect_url}\n" http://localhost:3000/settings/foo
+```
+Expected for both: `302` (or `307`) with `redirect_url` pointing to `/login?callbackUrl=%2Fdashboard` and `/login?callbackUrl=%2Fsettings%2Ffoo` respectively. Check the dev server's log output for the deprecation warning about the "middleware" file convention — it should NOT appear (confirms `src/proxy.ts` is the file Next.js is actually using, not a leftover `middleware.ts`). Stop the dev server.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add middleware.ts
-git commit -m "feat: protect /dashboard and /settings via middleware"
+git add src/lib/auth/auth.config.ts src/lib/auth/auth.ts src/proxy.ts
+git commit -m "fix: split Auth.js config for Edge Runtime, add proxy for route protection"
 ```
 
 ---
@@ -1328,6 +1407,8 @@ export async function loginAction(input: unknown): Promise<LoginResult> {
 
 - [ ] **Step 2: Write the client form**
 
+**Ruling (recorded in the SDD ledger, fix round after task review):** `callbackUrl` is an attacker-controllable query parameter (an attacker can craft `/login?callbackUrl=https://evil.example`) — the code below validates it's a same-origin relative path before navigating, closing an open-redirect gap the first draft of this plan didn't guard against.
+
 Create `src/app/(auth)/login/login-form.tsx`:
 ```tsx
 "use client"
@@ -1363,7 +1444,12 @@ export function LoginForm() {
     startTransition(async () => {
       const result = await loginAction(values)
       if (result.success) {
-        router.push(searchParams.get("callbackUrl") ?? "/dashboard")
+        const requested = searchParams.get("callbackUrl")
+        const safeCallbackUrl =
+          requested && requested.startsWith("/") && !requested.startsWith("//")
+            ? requested
+            : "/dashboard"
+        router.push(safeCallbackUrl)
         return
       }
       toast.error(result.formError)
@@ -1452,7 +1538,7 @@ git commit -m "feat: add login page, form, and server action"
 ### Task 12: App shell — sidebar, topbar, user menu
 
 **Files:**
-- Create: `src/config/site.ts`, `src/components/layout/app-shell.tsx`, `src/components/layout/sidebar-nav.tsx`, `src/components/layout/topbar.tsx`, `src/components/layout/user-menu.tsx`, `src/components/layout/sign-out-button.tsx`
+- Create: `src/config/site.ts`, `src/components/layout/app-shell.tsx`, `src/components/layout/sidebar-nav.tsx`, `src/components/layout/topbar.tsx`, `src/components/layout/user-menu.tsx`, `src/components/layout/sign-out-button.tsx`, `src/components/layout/sign-out-action.ts`
 
 **Interfaces:**
 - Consumes: `auth` (Task 8), shadcn `Sidebar*`/`DropdownMenu*`/`Avatar*`/`Breadcrumb*` primitives (Task 2).
@@ -1480,24 +1566,36 @@ Each future phase appends its module here — the sidebar component itself never
 
 - [ ] **Step 2: Sign-out server action + button**
 
+**Ruling (recorded in the SDD ledger — project-wide convention, applies here and in every later `asChild`/`render` usage in this plan, including Task 15's `AppearanceForm`):** the shadcn primitives actually installed in Task 2 are a mix of two underlying libraries, not one. `src/components/ui/button.tsx`, `label.tsx`, and `form.tsx` import from the umbrella `radix-ui` package (`import { Slot } from "radix-ui"`, `import { Label as LabelPrimitive } from "radix-ui"`) and use Radix's `Slot`-backed `asChild` pattern. Everything else — `sidebar.tsx`, `dropdown-menu.tsx`, `tooltip.tsx`, `breadcrumb.tsx`, etc. — is built on **Base UI** (`@base-ui/react`), confirmed by reading `src/components/ui/dropdown-menu.tsx`/`sidebar.tsx` directly (`import { Menu as MenuPrimitive } from "@base-ui/react/menu"`, `useRender` from `@base-ui/react/use-render`), and uses Base UI's `render` prop instead of `asChild`. So the accurate rule is: **`asChild` for the Radix-`Slot`-backed primitives (`button`, `label`, `form`); `render` for the Base-UI-backed primitives (everything else — sidebar, dropdown-menu, tooltip, breadcrumb, etc.)** — there are genuinely two conventions in this codebase, not one, and which to use is determined by which primitive you're extending. (Note: only the *scoped* `@radix-ui/*` packages are absent — the umbrella `radix-ui` package is installed and is exactly what `button`/`label`/`form` depend on.) The code below uses `render` throughout because it extends Base-UI-backed primitives — this is not a deviation, it's the correct API for those primitives. `render={<Element ... />}` merges the component's own behavior/data attributes onto `Element`, the same way Radix's `asChild` merges onto its child; anything passed as the component's own `children` becomes the content rendered inside that element. `DropdownMenuItem`'s `nativeButton` prop must be set to `true` whenever `render` points at a real `<button>` — Base UI's `MenuItem` otherwise assumes the rendered element is non-native and applies ARIA/keyboard handling meant for a `<div>`-based item, which logs a dev-mode warning against a real `<button>` and adds a redundant `role`.
+
+**Ruling (recorded in the SDD ledger, discovered and fixed during Task 14's verification — a real runtime bug, not caught by `pnpm build`):** `Topbar` is a Client Component (needs `usePathname()`) that directly renders `UserMenu`, which directly renders `SignOutButton` — this makes `SignOutButton` part of the client-reachable module graph, not a Server Component passed down as children. Two consequences, both confirmed by actually requesting an authenticated `/dashboard` page against a live dev server (`pnpm build` never exercises this — dynamic auth-gated routes aren't statically bundled, so this only surfaces on a real request):
+1. Next.js flatly rejects an **inline** `"use server"` action defined inside a Client-Component-reachable file (`Error: It is not allowed to define inline "use server" annotated Server Actions in Client Components`) — the fix Next.js itself documents is to export the action from a separate file with a top-level `"use server"` directive.
+2. Importing `signOut` from the full `@/lib/auth/auth` (which includes the Credentials provider → `verifyCredentials` → `verifyPassword` → `@node-rs/argon2`, a native module) into that same client-reachable graph fails to resolve in the browser bundle (`@node-rs/argon2`'s browser stub has no exports) — the same class of problem as Task 9's Edge Runtime issue, this time in the client bundle instead of the Edge bundle. The fix is the same shape: build a lightweight `NextAuth(authConfig)` instance from the edge-safe base config (no providers) rather than pulling in the full config.
+
+Create `src/components/layout/sign-out-action.ts` (a real Server Action module — top-level `"use server"`, not inline):
+```ts
+"use server"
+
+import NextAuth from "next-auth"
+import { authConfig } from "@/lib/auth/auth.config"
+
+const { signOut } = NextAuth(authConfig)
+
+export async function signOutAction() {
+  await signOut({ redirectTo: "/login" })
+}
+```
+
 Create `src/components/layout/sign-out-button.tsx`:
 ```tsx
-import { signOut } from "@/lib/auth/auth"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { signOutAction } from "./sign-out-action"
 
 export function SignOutButton() {
   return (
-    <form
-      action={async () => {
-        "use server"
-        await signOut({ redirectTo: "/login" })
-      }}
-      className="w-full"
-    >
-      <DropdownMenuItem asChild>
-        <button type="submit" className="w-full text-left">
-          Sign out
-        </button>
+    <form action={signOutAction} className="w-full">
+      <DropdownMenuItem nativeButton render={<button type="submit" className="w-full text-left" />}>
+        Sign out
       </DropdownMenuItem>
     </form>
   )
@@ -1526,11 +1624,12 @@ export function SidebarNav() {
     <SidebarMenu>
       {siteNav.map((item) => (
         <SidebarMenuItem key={item.href}>
-          <SidebarMenuButton asChild isActive={pathname.startsWith(item.href)}>
-            <Link href={item.href}>
-              <item.icon />
-              <span>{item.title}</span>
-            </Link>
+          <SidebarMenuButton
+            render={<Link href={item.href} />}
+            isActive={pathname.startsWith(item.href)}
+          >
+            <item.icon />
+            <span>{item.title}</span>
           </SidebarMenuButton>
         </SidebarMenuItem>
       ))}
@@ -1663,12 +1762,13 @@ export function AppShell({
       </Sidebar>
       <SidebarInset>
         <Topbar user={user} />
-        <main className="flex-1 p-6">{children}</main>
+        <div className="flex-1 p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )
 }
 ```
+`SidebarInset` (`src/components/ui/sidebar.tsx`) already renders a `<main>` element internally and forwards `children` onto it — wrapping the content in another `<main>` here would nest two `main` landmarks, which the HTML spec doesn't give defined meaning to and accessibility tooling flags as invalid. A plain `<div>` is correct; the landmark is already established one level up.
 
 - [ ] **Step 7: Verify**
 
@@ -2054,10 +2154,8 @@ export function AppearanceForm() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline">
-          Theme: {theme ?? "system"}
-        </Button>
+      <DropdownMenuTrigger render={<Button variant="outline" />}>
+        Theme: {theme ?? "system"}
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem onSelect={() => setTheme("light")}>Light</DropdownMenuItem>
