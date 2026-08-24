@@ -1456,7 +1456,7 @@ git commit -m "feat: add login page, form, and server action"
 
 **Interfaces:**
 - Consumes: `auth` (Task 8), shadcn `Sidebar*`/`DropdownMenu*`/`Avatar*`/`Breadcrumb*` primitives (Task 2).
-- Produces: `siteNav: { title: string; href: string; icon: LucideIcon }[]` from `@/config/site`; `AppShell({ user, children }: { user: { name: string | null; email: string; image: string | null }; children: React.ReactNode })` default export from `@/components/layout/app-shell`.
+- Produces: `siteNav: { title: string; href: string; icon: LucideIcon }[]` from `@/config/site`; `AppShell({ user, children }: { user: { name: string | null; email: string; image: string | null }; children: React.ReactNode })` from `@/components/layout/app-shell`.
 
 - [ ] **Step 1: Define the nav data**
 
@@ -1589,23 +1589,42 @@ export function UserMenu({
 
 - [ ] **Step 5: Topbar**
 
+The breadcrumb is derived from the current route via `siteNav`, not passed in as a static string — otherwise every page under `(app)` would show the same label. This requires `usePathname()`, so the component is a client component.
+
 Create `src/components/layout/topbar.tsx`:
 ```tsx
+"use client"
+
+import { usePathname } from "next/navigation"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@/components/ui/breadcrumb"
 import { SidebarTrigger } from "@/components/ui/sidebar"
+import { siteNav } from "@/config/site"
 import { UserMenu } from "./user-menu"
 
 export function Topbar({
-  title,
   user,
 }: {
-  title: string
   user: { name: string | null; email: string; image: string | null }
 }) {
+  const pathname = usePathname()
+  const current = siteNav.find((item) => pathname.startsWith(item.href))
+
   return (
     <header className="flex h-14 items-center justify-between border-b px-4">
       <div className="flex items-center gap-2">
         <SidebarTrigger />
-        <span className="font-medium">{title}</span>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>{current?.title ?? "ManageMe"}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
       </div>
       <UserMenu user={user} />
     </header>
@@ -1628,11 +1647,9 @@ import { SidebarNav } from "./sidebar-nav"
 import { Topbar } from "./topbar"
 
 export function AppShell({
-  title,
   user,
   children,
 }: {
-  title: string
   user: { name: string | null; email: string; image: string | null }
   children: React.ReactNode
 }) {
@@ -1645,7 +1662,7 @@ export function AppShell({
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <Topbar title={title} user={user} />
+        <Topbar user={user} />
         <main className="flex-1 p-6">{children}</main>
       </SidebarInset>
     </SidebarProvider>
@@ -1707,7 +1724,6 @@ export default async function AppLayout({
 
   return (
     <AppShell
-      title="ManageMe"
       user={{
         name: session.user.name ?? null,
         email: session.user.email ?? "",
