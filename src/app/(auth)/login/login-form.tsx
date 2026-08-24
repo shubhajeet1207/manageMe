@@ -31,7 +31,12 @@ export function LoginForm() {
     startTransition(async () => {
       const result = await loginAction(values)
       if (result.success) {
-        router.push(searchParams.get("callbackUrl") ?? "/dashboard")
+        const requested = searchParams.get("callbackUrl")
+        const safeCallbackUrl =
+          requested && requested.startsWith("/") && !requested.startsWith("//")
+            ? requested
+            : "/dashboard"
+        router.push(safeCallbackUrl)
         return
       }
       toast.error(result.formError)
