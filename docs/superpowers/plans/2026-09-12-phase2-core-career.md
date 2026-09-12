@@ -2250,7 +2250,8 @@ export function CompanySheet({
   trigger,
 }: {
   company?: Company
-  trigger: React.ReactNode
+  // Base UI's `render` prop requires a ReactElement, not the wider ReactNode.
+  trigger: React.ReactElement
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -3170,7 +3171,8 @@ export function ApplicationSheet({
 }: {
   companies: Pick<Company, "id" | "name">[]
   application?: ApplicationWithCompany
-  trigger: React.ReactNode
+  // Base UI's `render` prop requires a ReactElement, not the wider ReactNode.
+  trigger: React.ReactElement
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
