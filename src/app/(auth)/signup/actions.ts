@@ -1,14 +1,11 @@
 "use server"
 
+import type { ActionResult } from "@/types/action-result"
 import { signupSchema } from "@/server/validators/auth-schemas"
 import { EmailAlreadyExistsError, createUser } from "@/server/services/auth-service"
 import { signIn } from "@/lib/auth/auth"
 
-export type SignupResult =
-  | { success: true }
-  | { success: false; fieldErrors?: Record<string, string[] | undefined>; formError?: string }
-
-export async function signupAction(input: unknown): Promise<SignupResult> {
+export async function signupAction(input: unknown): Promise<ActionResult> {
   const parsed = signupSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }

@@ -1,5 +1,6 @@
 "use server"
 
+import type { ActionResult } from "@/types/action-result"
 import { auth } from "@/lib/auth/auth"
 import {
   changePasswordSchema,
@@ -10,10 +11,6 @@ import {
   changePassword,
   updateProfile,
 } from "@/server/services/auth-service"
-
-type ActionResult =
-  | { success: true }
-  | { success: false; fieldErrors?: Record<string, string[] | undefined>; formError?: string }
 
 export async function updateProfileAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
