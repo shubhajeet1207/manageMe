@@ -3,6 +3,8 @@ import { ApplicationStatus } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
+import { Button } from "@/components/ui/button"
+import { ApplicationSheet } from "./application-sheet"
 import { ApplicationTable } from "./application-table"
 import { ViewToggle } from "./view-toggle"
 
@@ -43,6 +45,7 @@ export default async function ApplicationsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ApplicationSheet companies={companies} trigger={<Button>Add application</Button>} />
           <ViewToggle view={view} />
         </div>
       </div>
@@ -53,9 +56,15 @@ export default async function ApplicationsPage({
           <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
             Add the first role you have applied for and it will show up on the board.
           </p>
+          <div className="mt-4">
+            <ApplicationSheet
+              companies={companies}
+              trigger={<Button>Add your first application</Button>}
+            />
+          </div>
         </div>
       ) : view === "table" ? (
-        <ApplicationTable applications={applications} />
+        <ApplicationTable applications={applications} companies={companies} />
       ) : null}
     </div>
   )

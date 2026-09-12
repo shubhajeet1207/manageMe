@@ -7,8 +7,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/status-badge"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import type { Company } from "@prisma/client"
+import { ApplicationSheet } from "./application-sheet"
+import { DeleteApplicationDialog } from "./delete-application-dialog"
 
 function formatSalary(app: ApplicationWithCompany) {
   if (app.salaryMin == null && app.salaryMax == null) return "—"
@@ -22,8 +26,10 @@ function formatSalary(app: ApplicationWithCompany) {
 
 export function ApplicationTable({
   applications,
+  companies = [],
 }: {
   applications: ApplicationWithCompany[]
+  companies?: Pick<Company, "id" | "name">[]
 }) {
   return (
     <div className="overflow-x-auto rounded-md border">
@@ -36,6 +42,7 @@ export function ApplicationTable({
             <TableHead>Location</TableHead>
             <TableHead>Applied</TableHead>
             <TableHead>Salary</TableHead>
+            <TableHead className="w-40 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -55,6 +62,21 @@ export function ApplicationTable({
                 {app.appliedAt ? app.appliedAt.toISOString().slice(0, 10) : "—"}
               </TableCell>
               <TableCell className="text-muted-foreground">{formatSalary(app)}</TableCell>
+              <TableCell className="text-right">
+                <ApplicationSheet
+                  companies={companies}
+                  application={app}
+                  trigger={
+                    <Button variant="ghost" size="sm">
+                      Edit
+                    </Button>
+                  }
+                />
+                <DeleteApplicationDialog
+                  applicationId={app.id}
+                  label={`${app.roleTitle} at ${app.company.name}`}
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
