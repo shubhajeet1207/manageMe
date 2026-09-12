@@ -4,6 +4,8 @@ import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 import { STATUS_LABELS } from "@/components/status-badge"
 import { ApplicationBoard } from "./application-board"
 import { ApplicationSheet } from "./application-sheet"
@@ -42,46 +44,35 @@ export default async function ApplicationsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Applications</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {all.length} application{all.length === 1 ? "" : "s"} tracked.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <ApplicationSheet companies={companies} trigger={<Button>Add application</Button>} />
-          {view === "table" && all.length > 0 ? (
-            <StatusFilter status={statusFilter} view={view} />
-          ) : null}
-          <ViewToggle view={view} status={statusFilter} />
-        </div>
-      </div>
+      <PageHeader
+        title="Applications"
+        description={`${all.length} application${all.length === 1 ? "" : "s"} tracked.`}
+      >
+        {view === "table" && all.length > 0 ? (
+          <StatusFilter status={statusFilter} view={view} />
+        ) : null}
+        <ViewToggle view={view} status={statusFilter} />
+        <ApplicationSheet companies={companies} trigger={<Button>Add application</Button>} />
+      </PageHeader>
 
       {all.length === 0 ? (
-        <div className="rounded-md border border-dashed p-10 text-center">
-          <h2 className="font-medium">No applications yet</h2>
-          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-            Add the first role you have applied for and it will show up on the board.
-          </p>
-          <div className="mt-4">
-            <ApplicationSheet
-              companies={companies}
-              trigger={<Button>Add your first application</Button>}
-            />
-          </div>
-        </div>
+        <EmptyState
+          title="No applications yet"
+          description="Add the first role you have applied for and it will show up on the board."
+        >
+          <ApplicationSheet
+            companies={companies}
+            trigger={<Button>Add your first application</Button>}
+          />
+        </EmptyState>
       ) : view === "table" ? (
         statusFilter && tableApplications.length === 0 ? (
-          <div className="rounded-md border border-dashed p-10 text-center">
-            <h2 className="font-medium">
-              No {filterStatusLabel(statusFilter).toLowerCase()} applications
-            </h2>
-            <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-              Nothing matches this filter. Choose &ldquo;All statuses&rdquo; to see every
-              application.
-            </p>
-          </div>
+          <EmptyState
+            title={`No ${filterStatusLabel(statusFilter).toLowerCase()} applications`}
+            description={
+              <>Nothing matches this filter. Choose &ldquo;All statuses&rdquo; to see every application.</>
+            }
+          />
         ) : (
           <ApplicationTable applications={tableApplications} companies={companies} />
         )

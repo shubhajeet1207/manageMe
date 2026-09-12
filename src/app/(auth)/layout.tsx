@@ -10,8 +10,14 @@ export default async function AuthLayout({
   if (session) redirect("/dashboard")
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <div className="w-full max-w-sm">{children}</div>
+    <div className="bg-background flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-sm space-y-5">
+        <div className="flex items-center justify-center gap-2">
+          <span className="bg-stage-applied size-2 rounded-[2px]" aria-hidden />
+          <span className="text-[15px] font-semibold tracking-tight">ManageMe</span>
+        </div>
+        {children}
+      </div>
     </div>
   )
 }

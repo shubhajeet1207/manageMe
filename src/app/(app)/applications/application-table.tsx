@@ -32,22 +32,22 @@ export function ApplicationTable({
   companies?: Pick<Company, "id" | "name">[]
 }) {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="border-border bg-card overflow-x-auto rounded-lg border">
       <Table>
-        <TableHeader>
-          <TableRow>
+        <TableHeader className="bg-well/70">
+          <TableRow className="hover:bg-transparent [&>th]:text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-medium [&>th]:tracking-[0.07em] [&>th]:uppercase">
             <TableHead>Company</TableHead>
             <TableHead>Role</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Location</TableHead>
             <TableHead>Applied</TableHead>
             <TableHead>Salary</TableHead>
-            <TableHead className="w-40 text-right">Actions</TableHead>
+            <TableHead className="w-36 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {applications.map((app) => (
-            <TableRow key={app.id}>
+            <TableRow key={app.id} className="[&>td]:px-3 [&>td]:py-1.5">
               <TableCell className="font-medium">
                 <Link href={`/companies/${app.companyId}`} className="hover:underline">
                   {app.company.name}
@@ -58,10 +58,12 @@ export function ApplicationTable({
                 <StatusBadge status={app.status} />
               </TableCell>
               <TableCell className="text-muted-foreground">{app.location ?? "—"}</TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="text-muted-foreground tabular-nums">
                 {app.appliedAt ? app.appliedAt.toISOString().slice(0, 10) : "—"}
               </TableCell>
-              <TableCell className="text-muted-foreground">{formatSalary(app)}</TableCell>
+              <TableCell className="text-muted-foreground tabular-nums">
+                {formatSalary(app)}
+              </TableCell>
               <TableCell className="text-right">
                 <ApplicationSheet
                   companies={companies}

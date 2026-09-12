@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth/auth"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { PageHeader } from "@/components/page-header"
 import { findById } from "@/server/repositories/user-repository"
 import { ProfileForm } from "./profile-form"
 import { PasswordForm } from "./password-form"
@@ -10,10 +11,10 @@ export default async function SettingsPage() {
   const user = session?.user?.id ? await findById(session.user.id) : null
 
   return (
-    <div className="max-w-lg space-y-6">
-      <h1 className="text-2xl font-semibold">Settings</h1>
+    <div className="max-w-xl space-y-6">
+      <PageHeader title="Settings" description="Your profile, sign-in and theme." />
 
-      <Card>
+      <Card className="ring-border">
         <CardHeader>
           <CardTitle>Profile</CardTitle>
         </CardHeader>
@@ -22,7 +23,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="ring-border">
         <CardHeader>
           <CardTitle>Security</CardTitle>
         </CardHeader>
@@ -31,7 +32,7 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="ring-border">
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
         </CardHeader>

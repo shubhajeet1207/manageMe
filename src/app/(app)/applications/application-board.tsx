@@ -14,7 +14,8 @@ import {
 } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { ApplicationStatus } from "@prisma/client"
-import { STATUS_LABELS, STATUS_ORDER } from "@/components/status-badge"
+import { STATUS_ACCENT, STATUS_LABELS, STATUS_ORDER } from "@/components/status-badge"
+import { cn } from "@/lib/utils"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
 import type { Company } from "@prisma/client"
 import { ApplicationCard } from "./application-card"
@@ -30,22 +31,49 @@ function Column({
   companies: Pick<Company, "id" | "name">[]
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
+  const isOutcome = status === "REJECTED"
 
   return (
     <section
       ref={setNodeRef}
       aria-label={STATUS_LABELS[status]}
-      className={`bg-muted/40 flex w-72 shrink-0 flex-col gap-2 rounded-lg p-3 ${
-        isOver ? "ring-primary ring-2" : ""
-      }`}
+      className={cn(
+        "flex w-64 shrink-0 flex-col lg:w-auto lg:min-w-0 lg:shrink",
+        isOutcome && "border-border lg:ml-2 lg:border-l lg:pl-3"
+      )}
     >
-      <header className="flex items-center justify-between">
-        <h2 className="text-sm font-medium">{STATUS_LABELS[status]}</h2>
-        <span className="text-muted-foreground text-xs">{applications.length}</span>
+      <div
+        className={cn("h-0.5 w-full rounded-full", STATUS_ACCENT[status])}
+        aria-hidden
+      />
+      <header className="flex items-center justify-between gap-2 px-0.5 pt-2.5 pb-2">
+        <h2
+          className={cn(
+            "truncate text-[11px] font-semibold tracking-[0.09em] uppercase",
+            isOutcome && "text-muted-foreground"
+          )}
+        >
+          {STATUS_LABELS[status]}
+        </h2>
+        <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+          {applications.length}
+        </span>
       </header>
-      {applications.map((application) => (
-        <ApplicationCard key={application.id} application={application} companies={companies} />
-      ))}
+      <div
+        className={cn(
+          "flex min-h-24 flex-1 flex-col gap-1.5 rounded-lg p-1.5 transition-colors",
+          isOutcome ? "border-border border border-dashed" : "bg-well",
+          isOver && "ring-ring ring-2"
+        )}
+      >
+        {applications.map((application) => (
+          <ApplicationCard
+            key={application.id}
+            application={application}
+            companies={companies}
+          />
+        ))}
+      </div>
     </section>
   )
 }
@@ -106,7 +134,11 @@ export function ApplicationBoard({
 
   return (
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      {/* Seven equal columns from lg up so the whole funnel is visible at once.
+          Narrower than that, seven columns would be ~50px each; the board falls
+          back to fixed-width columns on a scroller and the table view is the
+          better small-screen path. */}
+      <div className="flex gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-2 lg:overflow-x-visible lg:pb-0">
         {STATUS_ORDER.map((status) => (
           <Column
             key={status}

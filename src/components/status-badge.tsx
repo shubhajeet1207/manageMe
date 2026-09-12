@@ -22,19 +22,39 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   REJECTED: "Rejected",
 }
 
+// A job pipeline is a funnel, not a workflow: REJECTED is where applications
+// land, not a stage they pass through. Everything that renders the pipeline
+// reads these two maps, so the board rules, the badges and the dashboard
+// summary all carry the same hue for the same stage.
+export const STATUS_ACCENT: Record<ApplicationStatus, string> = {
+  SAVED: "bg-stage-saved",
+  APPLIED: "bg-stage-applied",
+  SCREENING: "bg-stage-screening",
+  INTERVIEW: "bg-stage-interview",
+  OFFER: "bg-stage-offer",
+  ACCEPTED: "bg-stage-accepted",
+  REJECTED: "bg-stage-rejected",
+}
+
 const STATUS_CLASSES: Record<ApplicationStatus, string> = {
-  SAVED: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
-  APPLIED: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200",
-  SCREENING: "bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200",
-  INTERVIEW: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
-  OFFER: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200",
-  ACCEPTED: "bg-green-600 text-white dark:bg-green-700",
-  REJECTED: "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
+  SAVED: "bg-slate-500/10 text-slate-700 dark:bg-slate-400/12 dark:text-slate-300",
+  APPLIED: "bg-blue-600/10 text-blue-700 dark:bg-blue-400/14 dark:text-blue-300",
+  SCREENING: "bg-violet-600/10 text-violet-700 dark:bg-violet-400/14 dark:text-violet-300",
+  INTERVIEW: "bg-amber-500/16 text-amber-800 dark:bg-amber-400/14 dark:text-amber-300",
+  OFFER: "bg-emerald-600/12 text-emerald-700 dark:bg-emerald-400/14 dark:text-emerald-300",
+  ACCEPTED: "bg-green-600/16 text-green-700 dark:bg-green-400/16 dark:text-green-300",
+  REJECTED: "bg-rose-500/8 text-rose-700/80 dark:bg-rose-400/8 dark:text-rose-300/70",
 }
 
 export function StatusBadge({ status }: { status: ApplicationStatus }) {
   return (
-    <Badge variant="secondary" className={cn("border-transparent", STATUS_CLASSES[status])}>
+    <Badge
+      variant="secondary"
+      className={cn(
+        "rounded-md px-1.5 py-0.5 text-[11px] font-medium",
+        STATUS_CLASSES[status]
+      )}
+    >
       {STATUS_LABELS[status]}
     </Badge>
   )

@@ -14,20 +14,20 @@ import { DeleteCompanyDialog } from "./delete-company-dialog"
 
 export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
   return (
-    <div className="overflow-x-auto rounded-md border">
+    <div className="border-border bg-card overflow-x-auto rounded-lg border">
       <Table>
-        <TableHeader>
-          <TableRow>
+        <TableHeader className="bg-well/70">
+          <TableRow className="hover:bg-transparent [&>th]:text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-medium [&>th]:tracking-[0.07em] [&>th]:uppercase">
             <TableHead>Name</TableHead>
             <TableHead>Website</TableHead>
             <TableHead>Location</TableHead>
             <TableHead className="text-right">Applications</TableHead>
-            <TableHead className="w-40 text-right">Actions</TableHead>
+            <TableHead className="w-36 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {companies.map((company) => (
-            <TableRow key={company.id}>
+            <TableRow key={company.id} className="[&>td]:px-3 [&>td]:py-1.5">
               <TableCell className="font-medium">
                 <Link href={`/companies/${company.id}`} className="hover:underline">
                   {company.name}
@@ -48,7 +48,9 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
                 )}
               </TableCell>
               <TableCell className="text-muted-foreground">{company.location ?? "—"}</TableCell>
-              <TableCell className="text-right">{company._count.applications}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {company._count.applications}
+              </TableCell>
               <TableCell className="text-right">
                 <CompanySheet
                   company={company}

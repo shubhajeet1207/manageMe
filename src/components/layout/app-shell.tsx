@@ -17,9 +17,12 @@ export function AppShell({
 }) {
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader className="px-4 py-3 font-semibold">ManageMe</SidebarHeader>
-        <SidebarContent>
+      <Sidebar className="border-sidebar-border">
+        <SidebarHeader className="h-14 flex-row items-center gap-2 px-4">
+          <span className="bg-stage-applied size-2 rounded-[2px]" aria-hidden />
+          <span className="text-[15px] font-semibold tracking-tight">ManageMe</span>
+        </SidebarHeader>
+        <SidebarContent className="px-2">
           <SidebarNav />
         </SidebarContent>
       </Sidebar>

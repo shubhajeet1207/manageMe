@@ -20,13 +20,15 @@ export function Topbar({
   const current = siteNav.find((item) => pathname.startsWith(item.href))
 
   return (
-    <header className="flex h-14 items-center justify-between border-b px-4">
-      <div className="flex items-center gap-2">
+    <header className="border-border bg-background/85 sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b px-4 backdrop-blur">
+      <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger />
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbPage>{current?.title ?? "ManageMe"}</BreadcrumbPage>
+              <BreadcrumbPage className="text-muted-foreground text-[13px] font-medium">
+                {current?.title ?? "ManageMe"}
+              </BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>

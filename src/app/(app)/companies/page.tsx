@@ -2,6 +2,8 @@ import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { listCompanies } from "@/server/services/company-service"
 import { Button } from "@/components/ui/button"
+import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 import { CompanySheet } from "./company-sheet"
 import { CompanyTable } from "./company-table"
 
@@ -13,27 +15,20 @@ export default async function CompaniesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Companies</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Every company you are tracking, and how many applications you have with each.
-          </p>
-        </div>
+      <PageHeader
+        title="Companies"
+        description="Every company you are tracking, and how many applications you have with each."
+      >
         <CompanySheet trigger={<Button>Add company</Button>} />
-      </div>
+      </PageHeader>
 
       {companies.length === 0 ? (
-        <div className="rounded-md border border-dashed p-10 text-center">
-          <h2 className="font-medium">No companies yet</h2>
-          <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
-            Companies are created automatically when you add an application, or you can add one
-            here first.
-          </p>
-          <div className="mt-4">
-            <CompanySheet trigger={<Button>Add your first company</Button>} />
-          </div>
-        </div>
+        <EmptyState
+          title="No companies yet"
+          description="Companies are created automatically when you add an application, or you can add one here first."
+        >
+          <CompanySheet trigger={<Button>Add your first company</Button>} />
+        </EmptyState>
       ) : (
         <CompanyTable companies={companies} />
       )}

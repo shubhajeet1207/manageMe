@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth/auth"
 import { CompanyNotFoundError, getCompany } from "@/server/services/company-service"
 import { listApplicationsForCompany } from "@/server/services/application-service"
 import { ApplicationTable } from "@/app/(app)/applications/application-table"
+import { EmptyState } from "@/components/empty-state"
+import { PageHeader } from "@/components/page-header"
 
 export default async function CompanyDetailPage({
   params,
@@ -26,23 +28,28 @@ export default async function CompanyDetailPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{company.name}</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          {[company.location, company.website].filter(Boolean).join(" · ") || "No details yet"}
+      <PageHeader
+        title={company.name}
+        description={
+          [company.location, company.website].filter(Boolean).join(" · ") || "No details yet"
+        }
+      />
+
+      {company.notes ? (
+        <p className="text-muted-foreground max-w-2xl text-sm whitespace-pre-wrap">
+          {company.notes}
         </p>
-      </div>
+      ) : null}
 
-      {company.notes ? <p className="text-sm whitespace-pre-wrap">{company.notes}</p> : null}
-
-      <div className="space-y-2">
-        <h2 className="font-medium">
-          Applications ({applications.length})
+      <div className="space-y-3">
+        <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+          Applications <span className="tabular-nums">({applications.length})</span>
         </h2>
         {applications.length === 0 ? (
-          <p className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-            No applications at this company yet.
-          </p>
+          <EmptyState
+            title="No applications here yet"
+            description="Applications you add for this company will be listed here."
+          />
         ) : (
           <ApplicationTable applications={applications} />
         )}

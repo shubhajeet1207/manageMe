@@ -39,8 +39,8 @@ export function ApplicationCard({
           : undefined,
       }}
       className={cn(
-        "bg-card flex w-full cursor-grab items-start gap-2 rounded-md border p-3 text-left shadow-sm active:cursor-grabbing",
-        isDragging && "opacity-50"
+        "group/card bg-card border-border hover:border-foreground/20 flex w-full cursor-grab items-start gap-1 rounded-md border px-2 py-1.5 text-left transition-colors active:cursor-grabbing",
+        isDragging && "border-ring opacity-70 shadow-lg"
       )}
     >
       <ApplicationSheet
@@ -48,12 +48,14 @@ export function ApplicationCard({
         application={application}
         trigger={
           <button className="min-w-0 flex-1 text-left">
-            <span className="block text-sm font-medium">{application.company.name}</span>
-            <span className="text-muted-foreground block text-sm">
+            <span className="block text-[13px] leading-snug font-medium break-words">
+              {application.company.name}
+            </span>
+            <span className="text-muted-foreground block text-xs leading-snug break-words">
               {application.roleTitle}
             </span>
             {application.location ? (
-              <span className="text-muted-foreground mt-1 block text-xs">
+              <span className="text-muted-foreground/75 mt-1 block text-[11px] leading-snug break-words">
                 {application.location}
               </span>
             ) : null}
@@ -66,9 +68,9 @@ export function ApplicationCard({
         {...listeners}
         {...attributes}
         aria-label={`Reorder ${label}`}
-        className="text-muted-foreground hover:text-foreground shrink-0 cursor-grab rounded-sm p-1 active:cursor-grabbing"
+        className="text-muted-foreground/45 hover:text-foreground group-hover/card:text-muted-foreground -mr-0.5 shrink-0 cursor-grab rounded-sm p-0.5 active:cursor-grabbing"
       >
-        <GripVerticalIcon className="size-4" aria-hidden />
+        <GripVerticalIcon className="size-3.5" aria-hidden />
       </button>
     </article>
   )
