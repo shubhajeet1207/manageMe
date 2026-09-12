@@ -67,7 +67,7 @@ export default async function ApplicationsPage({
       ) : view === "table" ? (
         <ApplicationTable applications={applications} companies={companies} />
       ) : (
-        <ApplicationBoard applications={applications} />
+        <ApplicationBoard applications={applications} companies={companies} />
       )}
     </div>
   )

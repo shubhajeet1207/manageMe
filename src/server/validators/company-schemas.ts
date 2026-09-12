@@ -15,6 +15,20 @@ const optionalUrl = z
   .string()
   .trim()
   .url("Enter a valid URL")
+  // `url()` alone accepts any scheme, including `javascript:`/`data:`, which
+  // would otherwise flow straight into an `<a href>`. Zod runs every check on
+  // a schema even after an earlier one fails, so guard against `new URL()`
+  // throwing on a value `.url()` has already rejected.
+  .refine(
+    (value) => {
+      try {
+        return ["http:", "https:"].includes(new URL(value).protocol)
+      } catch {
+        return false
+      }
+    },
+    { message: "Enter a valid URL" }
+  )
   .or(z.literal(""))
   .transform((value) => (value === "" ? undefined : value))
   .optional()

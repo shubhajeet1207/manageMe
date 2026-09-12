@@ -16,15 +16,18 @@ import { toast } from "sonner"
 import { ApplicationStatus } from "@prisma/client"
 import { STATUS_LABELS, STATUS_ORDER } from "@/components/status-badge"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import type { Company } from "@prisma/client"
 import { ApplicationCard } from "./application-card"
 import { changeStatusAction } from "./actions"
 
 function Column({
   status,
   applications,
+  companies,
 }: {
   status: ApplicationStatus
   applications: ApplicationWithCompany[]
+  companies: Pick<Company, "id" | "name">[]
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
 
@@ -41,7 +44,7 @@ function Column({
         <span className="text-muted-foreground text-xs">{applications.length}</span>
       </header>
       {applications.map((application) => (
-        <ApplicationCard key={application.id} application={application} />
+        <ApplicationCard key={application.id} application={application} companies={companies} />
       ))}
     </section>
   )
@@ -49,11 +52,22 @@ function Column({
 
 export function ApplicationBoard({
   applications,
+  companies,
 }: {
   applications: ApplicationWithCompany[]
+  companies: Pick<Company, "id" | "name">[]
 }) {
   const router = useRouter()
   const [items, setItems] = useState(applications)
+  // Re-sync local (optimistic-drag) state when the server-provided prop
+  // changes, e.g. after router.refresh() adds/edits an application — done
+  // during render (not an effect) per React's "adjusting state when a prop
+  // changes" pattern, so it can't race with the optimistic drag update.
+  const [prevApplications, setPrevApplications] = useState(applications)
+  if (applications !== prevApplications) {
+    setPrevApplications(applications)
+    setItems(applications)
+  }
 
   const sensors = useSensors(
     // A small distance threshold keeps a plain click from registering as a drag.
@@ -98,6 +112,7 @@ export function ApplicationBoard({
             key={status}
             status={status}
             applications={items.filter((item) => item.status === status)}
+            companies={companies}
           />
         ))}
       </div>

@@ -34,6 +34,12 @@ describe("createCompanySchema", () => {
     expect(result.success).toBe(true)
   })
 
+  it("rejects a javascript: URL", () => {
+    const result = createCompanySchema.safeParse({ name: "Acme", website: "javascript:alert(1)" })
+    expect(result.success).toBe(false)
+    expect(result.error?.flatten().fieldErrors.website?.[0]).toBe("Enter a valid URL")
+  })
+
   it("normalises an empty website to undefined", () => {
     const result = createCompanySchema.safeParse({ name: "Acme", website: "" })
     expect(result.success && result.data.website).toBeUndefined()

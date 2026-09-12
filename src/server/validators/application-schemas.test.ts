@@ -58,6 +58,17 @@ describe("createApplicationSchema", () => {
     expect(result.success && result.data.jobUrl).toBeUndefined()
   })
 
+  it("rejects a javascript: job URL", () => {
+    const result = createApplicationSchema.safeParse({ ...base, jobUrl: "javascript:alert(1)" })
+    expect(result.success).toBe(false)
+    expect(result.error?.flatten().fieldErrors.jobUrl?.[0]).toBe("Enter a valid URL")
+  })
+
+  it("accepts a valid job URL", () => {
+    const result = createApplicationSchema.safeParse({ ...base, jobUrl: "https://jobs.example.com/1" })
+    expect(result.success).toBe(true)
+  })
+
   it("coerces salary strings to integers", () => {
     const result = createApplicationSchema.safeParse({ ...base, salaryMin: "1000", salaryMax: "2000" })
     expect(result.success && result.data.salaryMin).toBe(1000)

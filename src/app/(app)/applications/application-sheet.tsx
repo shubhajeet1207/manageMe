@@ -31,6 +31,15 @@ import type { Company } from "@prisma/client"
 import { createApplicationAction, updateApplicationAction } from "./actions"
 import { resolveCompanyAction } from "./company-actions"
 
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null
+  return (
+    <p role="alert" className="text-destructive text-sm">
+      {message}
+    </p>
+  )
+}
+
 type FormValues = {
   roleTitle: string
   status: ApplicationStatus
@@ -152,12 +161,11 @@ export function ApplicationSheet({
 
           <div className="space-y-2">
             <Label htmlFor="roleTitle">Role title</Label>
-            <Input id="roleTitle" {...form.register("roleTitle", { required: true })} />
-            {errors.roleTitle ? (
-              <p role="alert" className="text-destructive text-sm">
-                Role title is required
-              </p>
-            ) : null}
+            <Input
+              id="roleTitle"
+              {...form.register("roleTitle", { required: "Role title is required" })}
+            />
+            <FieldError message={errors.roleTitle?.message} />
           </div>
 
           <div className="space-y-2">
@@ -184,12 +192,14 @@ export function ApplicationSheet({
           <div className="space-y-2">
             <Label htmlFor="jobUrl">Job URL</Label>
             <Input id="jobUrl" placeholder="https://…" {...form.register("jobUrl")} />
+            <FieldError message={errors.jobUrl?.message} />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Input id="location" {...form.register("location")} />
+              <FieldError message={errors.location?.message} />
             </div>
             <div className="space-y-2">
               <Label>Work mode</Label>
@@ -215,14 +225,17 @@ export function ApplicationSheet({
             <div className="space-y-2">
               <Label htmlFor="salaryMin">Salary min</Label>
               <Input id="salaryMin" inputMode="numeric" {...form.register("salaryMin")} />
+              <FieldError message={errors.salaryMin?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="salaryMax">Salary max</Label>
               <Input id="salaryMax" inputMode="numeric" {...form.register("salaryMax")} />
+              <FieldError message={errors.salaryMax?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="currency">Currency</Label>
               <Input id="currency" placeholder="INR" {...form.register("currency")} />
+              <FieldError message={errors.currency?.message} />
             </div>
           </div>
 
@@ -230,16 +243,19 @@ export function ApplicationSheet({
             <div className="space-y-2">
               <Label htmlFor="appliedAt">Applied on</Label>
               <Input id="appliedAt" type="date" {...form.register("appliedAt")} />
+              <FieldError message={errors.appliedAt?.message} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="source">Source</Label>
               <Input id="source" placeholder="LinkedIn" {...form.register("source")} />
+              <FieldError message={errors.source?.message} />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes</Label>
             <Textarea id="notes" rows={4} {...form.register("notes")} />
+            <FieldError message={errors.notes?.message} />
           </div>
 
           <Button type="submit" className="w-full" disabled={isPending}>
