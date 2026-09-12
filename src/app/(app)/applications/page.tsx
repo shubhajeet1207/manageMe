@@ -1,22 +1,15 @@
 import { redirect } from "next/navigation"
-import { ApplicationStatus } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
 import { Button } from "@/components/ui/button"
+import { STATUS_LABELS } from "@/components/status-badge"
 import { ApplicationBoard } from "./application-board"
 import { ApplicationSheet } from "./application-sheet"
 import { ApplicationTable } from "./application-table"
+import { parseStatus, parseView } from "./search-params"
+import { StatusFilter } from "./status-filter"
 import { ViewToggle } from "./view-toggle"
-
-function parseView(value: string | undefined): "board" | "table" {
-  return value === "table" ? "table" : "board"
-}
-
-function parseStatus(value: string | undefined): ApplicationStatus | null {
-  if (value && value in ApplicationStatus) return value as ApplicationStatus
-  return null
-}
 
 export default async function ApplicationsPage({
   searchParams,
@@ -34,7 +27,9 @@ export default async function ApplicationsPage({
     listApplications(session.user.id),
     listCompanies(session.user.id),
   ])
-  const applications = statusFilter ? all.filter((a) => a.status === statusFilter) : all
+  // Filtering is a table-view affordance (§7); the board always shows the whole
+  // pipeline, or its columns would lie about what the pipeline holds.
+  const tableApplications = statusFilter ? all.filter((a) => a.status === statusFilter) : all
 
   return (
     <div className="space-y-6">
@@ -45,9 +40,12 @@ export default async function ApplicationsPage({
             {all.length} application{all.length === 1 ? "" : "s"} tracked.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <ApplicationSheet companies={companies} trigger={<Button>Add application</Button>} />
-          <ViewToggle view={view} />
+          {view === "table" && all.length > 0 ? (
+            <StatusFilter status={statusFilter} view={view} />
+          ) : null}
+          <ViewToggle view={view} status={statusFilter} />
         </div>
       </div>
 
@@ -65,9 +63,21 @@ export default async function ApplicationsPage({
           </div>
         </div>
       ) : view === "table" ? (
-        <ApplicationTable applications={applications} companies={companies} />
+        statusFilter && tableApplications.length === 0 ? (
+          <div className="rounded-md border border-dashed p-10 text-center">
+            <h2 className="font-medium">
+              No {STATUS_LABELS[statusFilter].toLowerCase()} applications
+            </h2>
+            <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
+              Nothing matches this filter. Choose &ldquo;All statuses&rdquo; to see every
+              application.
+            </p>
+          </div>
+        ) : (
+          <ApplicationTable applications={tableApplications} companies={companies} />
+        )
       ) : (
-        <ApplicationBoard applications={applications} companies={companies} />
+        <ApplicationBoard applications={all} companies={companies} />
       )}
     </div>
   )
