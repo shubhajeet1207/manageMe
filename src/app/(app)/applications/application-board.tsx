@@ -133,7 +133,18 @@ export function ApplicationBoard({
   }
 
   return (
-    <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
+    // `id` is not cosmetic. Without it dnd-kit derives the aria-describedby it
+    // stamps on every draggable from useUniqueId, a module-level counter that
+    // restarts at 0 on each server render but keeps climbing on the client —
+    // so SSR emitted aria-describedby="DndDescribedBy-0" while hydration
+    // expected "DndDescribedBy-29", and React logged an attribute hydration
+    // mismatch. A literal id short-circuits the counter on both sides.
+    <DndContext
+      id="application-board"
+      sensors={sensors}
+      collisionDetection={closestCorners}
+      onDragEnd={onDragEnd}
+    >
       {/* Seven equal columns from lg up so the whole funnel is visible at once.
           Narrower than that, seven columns would be ~50px each; the board falls
           back to fixed-width columns on a scroller and the table view is the

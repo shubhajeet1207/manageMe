@@ -32,7 +32,20 @@ export function ApplicationCard({
     // still draggable with a mouse.
     <article
       ref={setNodeRef}
-      {...listeners}
+      // PointerSensor has no activator-node guard of its own, and React
+      // synthetic events propagate up the *React* tree rather than the DOM
+      // tree. ApplicationSheet is a React child of this article but renders
+      // its content through a portal, so a pointerdown inside the open sheet —
+      // drag-selecting text in the Notes field, say — used to reach this
+      // handler and arm the sensor for the card buried under the overlay: the
+      // card translated away, the selection was wiped every frame, and mouseup
+      // dropped it into whatever column it had wandered over, POSTing a status
+      // change nobody asked for. Containment is the exact test, because the
+      // portaled content genuinely is not a DOM descendant of this article.
+      onPointerDown={(event) => {
+        if (!event.currentTarget.contains(event.target as Node)) return
+        listeners?.onPointerDown?.(event)
+      }}
       style={{
         transform: transform
           ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
@@ -65,7 +78,11 @@ export function ApplicationCard({
       <button
         type="button"
         ref={setActivatorNodeRef}
-        {...listeners}
+        // Only the keyboard half of the listener map belongs here. The grip is
+        // a DOM child of the article, so its pointerdown already bubbles to the
+        // wrapper's gated handler; spreading the whole map would run the
+        // PointerSensor activator twice for one press.
+        onKeyDown={(event) => listeners?.onKeyDown?.(event)}
         {...attributes}
         aria-label={`Reorder ${label}`}
         className="text-muted-foreground/45 hover:text-foreground group-hover/card:text-muted-foreground -mr-0.5 shrink-0 cursor-grab rounded-sm p-0.5 active:cursor-grabbing"
