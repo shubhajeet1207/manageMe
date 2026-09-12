@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { listCompanies } from "@/server/services/company-service"
+import { Button } from "@/components/ui/button"
+import { CompanySheet } from "./company-sheet"
 import { CompanyTable } from "./company-table"
 
 export default async function CompaniesPage() {
@@ -18,6 +20,7 @@ export default async function CompaniesPage() {
             Every company you are tracking, and how many applications you have with each.
           </p>
         </div>
+        <CompanySheet trigger={<Button>Add company</Button>} />
       </div>
 
       {companies.length === 0 ? (
@@ -27,6 +30,9 @@ export default async function CompaniesPage() {
             Companies are created automatically when you add an application, or you can add one
             here first.
           </p>
+          <div className="mt-4">
+            <CompanySheet trigger={<Button>Add your first company</Button>} />
+          </div>
         </div>
       ) : (
         <CompanyTable companies={companies} />

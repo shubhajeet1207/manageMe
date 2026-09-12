@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -8,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { CompanyWithCount } from "@/server/repositories/company-repository"
+import { CompanySheet } from "./company-sheet"
 
 export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
   return (
@@ -19,6 +21,7 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
             <TableHead>Website</TableHead>
             <TableHead>Location</TableHead>
             <TableHead className="text-right">Applications</TableHead>
+            <TableHead className="w-24 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -45,6 +48,16 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
               </TableCell>
               <TableCell className="text-muted-foreground">{company.location ?? "—"}</TableCell>
               <TableCell className="text-right">{company._count.applications}</TableCell>
+              <TableCell className="text-right">
+                <CompanySheet
+                  company={company}
+                  trigger={
+                    <Button variant="ghost" size="sm">
+                      Edit
+                    </Button>
+                  }
+                />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
