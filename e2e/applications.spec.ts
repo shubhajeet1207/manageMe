@@ -3,11 +3,11 @@ import { test, expect } from "@playwright/test"
 import { prisma } from "@/lib/db/prisma"
 
 test.describe("career routes", () => {
-  // The board lays out all 7 status columns side by side (7 * 304px), wider than
-  // Playwright's default 1280px viewport. With a narrower viewport the drag target
-  // sits outside the visible area, and dnd-kit's auto-scroll shifts the columns
-  // mid-drag, landing the card one column over from wherever the pointer aimed.
-  test.use({ viewport: { width: 2400, height: 900 } })
+  let email: string
+
+  test.afterEach(async () => {
+    if (email) await prisma.user.deleteMany({ where: { email } })
+  })
 
   test("unauthenticated requests to career routes redirect to login", async ({ browser }) => {
     const context = await browser.newContext()
@@ -23,7 +23,7 @@ test.describe("career routes", () => {
   })
 
   test("create a company and an application, move it, then delete", async ({ page }) => {
-    const email = `career-e2e-${Date.now()}@example.com`
+    email = `career-e2e-${Date.now()}@example.com`
     const password = "Password123"
     const company = `Acme ${Date.now()}`
 
@@ -101,7 +101,5 @@ test.describe("career routes", () => {
     await page.getByRole("button", { name: "Delete" }).first().click()
     await page.getByRole("button", { name: "Delete", exact: true }).last().click()
     await expect(page.getByText("Staff Engineer")).toHaveCount(0)
-
-    await prisma.user.deleteMany({ where: { email } })
   })
 })
