@@ -338,11 +338,13 @@ unbuilt modules.
 
 ## 10. Route protection
 
-`middleware.ts`'s matcher must be extended to cover `/applications/:path*`
-and `/companies/:path*`. This is easy to forget and would silently
-expose both pages to unauthenticated users, so it is called out here as
-a required step rather than left implicit — and §11.4 requires an E2E
-test proving it.
+`src/proxy.ts` guards protected routes. Next.js 16 renamed middleware to
+**proxy**, so this project has no `middleware.ts` — the file is
+`src/proxy.ts`, and it gates routes in two places that must be kept in
+sync: the `startsWith` checks in the handler body and the `config.matcher`
+array. Both must be extended to cover `/applications` and `/companies`.
+Updating only one silently half-protects the routes, so §11.4 requires an
+E2E test proving the redirect.
 
 Server Actions do not rely on middleware for authorization: every action
 independently calls `auth()` and returns `{ success: false, formError:
