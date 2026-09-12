@@ -186,7 +186,7 @@ export function ApplicationSheet({
             <Input id="jobUrl" placeholder="https://…" {...form.register("jobUrl")} />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
               <Input id="location" {...form.register("location")} />
@@ -211,7 +211,7 @@ export function ApplicationSheet({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="salaryMin">Salary min</Label>
               <Input id="salaryMin" inputMode="numeric" {...form.register("salaryMin")} />
@@ -226,7 +226,7 @@ export function ApplicationSheet({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="appliedAt">Applied on</Label>
               <Input id="appliedAt" type="date" {...form.register("appliedAt")} />
