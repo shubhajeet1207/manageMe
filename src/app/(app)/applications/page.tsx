@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import type { ApplicationStatus } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
@@ -10,6 +11,14 @@ import { ApplicationTable } from "./application-table"
 import { parseStatus, parseView } from "./search-params"
 import { StatusFilter } from "./status-filter"
 import { ViewToggle } from "./view-toggle"
+
+// STATUS_LABELS is keyed by the enum, but any string can be indexed into it at
+// runtime; an unexpected key (e.g. an inherited object property like
+// "toString") would otherwise return a non-string and crash `.toLowerCase()`.
+function filterStatusLabel(status: ApplicationStatus): string {
+  const label = STATUS_LABELS[status]
+  return typeof label === "string" ? label : "matching"
+}
 
 export default async function ApplicationsPage({
   searchParams,
@@ -66,7 +75,7 @@ export default async function ApplicationsPage({
         statusFilter && tableApplications.length === 0 ? (
           <div className="rounded-md border border-dashed p-10 text-center">
             <h2 className="font-medium">
-              No {STATUS_LABELS[statusFilter].toLowerCase()} applications
+              No {filterStatusLabel(statusFilter).toLowerCase()} applications
             </h2>
             <p className="text-muted-foreground mx-auto mt-1 max-w-md text-sm">
               Nothing matches this filter. Choose &ldquo;All statuses&rdquo; to see every
