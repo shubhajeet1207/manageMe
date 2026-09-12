@@ -346,20 +346,24 @@ Expected: FAIL — cannot resolve `./company-schemas`.
 ```ts
 import { z } from "zod"
 
+// `.optional()` MUST be the outermost wrapper. Applying `.transform()` after
+// `.optional()` hides the optional marker from Zod's key inference, producing
+// `website: string | undefined` (a required key) instead of `website?: string`,
+// which breaks every caller that omits the field.
 const optionalText = z
   .string()
   .trim()
   .max(500)
-  .optional()
   .transform((value) => (value === "" ? undefined : value))
+  .optional()
 
 const optionalUrl = z
   .string()
   .trim()
   .url("Enter a valid URL")
-  .optional()
   .or(z.literal(""))
   .transform((value) => (value === "" ? undefined : value))
+  .optional()
 
 export const createCompanySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200),
@@ -947,6 +951,12 @@ describe("createApplicationSchema", () => {
     expect(result.success && result.data.salaryMax).toBe(2000)
   })
 
+  it("normalises empty salary strings to undefined", () => {
+    const result = createApplicationSchema.safeParse({ ...base, salaryMin: "", salaryMax: "" })
+    expect(result.success && result.data.salaryMin).toBeUndefined()
+    expect(result.success && result.data.salaryMax).toBeUndefined()
+  })
+
   it("rejects a negative salary", () => {
     expect(createApplicationSchema.safeParse({ ...base, salaryMin: -1 }).success).toBe(false)
   })
@@ -1023,34 +1033,36 @@ Expected: FAIL — cannot resolve `./application-schemas`.
 import { z } from "zod"
 import { ApplicationStatus, WorkMode } from "@prisma/client"
 
+// `.optional()` MUST be the outermost wrapper on every field below — see the
+// note in company-schemas.ts. Transform-after-optional yields required keys.
 const optionalText = z
   .string()
   .trim()
   .max(2000)
-  .optional()
   .transform((value) => (value === "" ? undefined : value))
+  .optional()
 
 const optionalUrl = z
   .string()
   .trim()
   .url("Enter a valid URL")
-  .optional()
   .or(z.literal(""))
   .transform((value) => (value === "" ? undefined : value))
-
-const optionalSalary = z.coerce
-  .number()
-  .int()
-  .min(0, "Salary cannot be negative")
   .optional()
-  .or(z.literal(""))
-  .transform((value) => (value === "" || value === undefined ? undefined : Number(value)))
+
+// The empty-string branch must be tried BEFORE coercion: `z.coerce.number()`
+// turns "" into 0, so a blank salary field would silently save as 0 rather
+// than staying empty.
+const optionalSalary = z
+  .union([z.literal(""), z.coerce.number().int().min(0, "Salary cannot be negative")])
+  .transform((value) => (value === "" ? undefined : value))
+  .optional()
 
 const optionalPastDate = z.coerce
   .date()
-  .optional()
   .or(z.literal(""))
-  .transform((value) => (value === "" || value === undefined ? undefined : new Date(value)))
+  .transform((value) => (value === "" ? undefined : value))
+  .optional()
 
 const applicationFields = z.object({
   companyId: z.string().min(1, "Company is required"),
@@ -1058,10 +1070,10 @@ const applicationFields = z.object({
   status: z.enum(ApplicationStatus).default("SAVED"),
   jobUrl: optionalUrl,
   location: optionalText,
-  workMode: z.enum(WorkMode).optional().or(z.literal("")).transform((v) => (v === "" ? undefined : v)),
+  workMode: z.enum(WorkMode).or(z.literal("")).transform((v) => (v === "" ? undefined : v)).optional(),
   salaryMin: optionalSalary,
   salaryMax: optionalSalary,
-  currency: z.string().trim().max(10).optional().transform((v) => (v === "" ? undefined : v)),
+  currency: z.string().trim().max(10).transform((v) => (v === "" ? undefined : v)).optional(),
   source: optionalText,
   appliedAt: optionalPastDate,
   notes: optionalText,
@@ -1104,7 +1116,7 @@ export type UpdateStatusInput = z.infer<typeof updateStatusSchema>
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `pnpm vitest run src/server/validators/application-schemas.test.ts`
-Expected: PASS, 20 tests.
+Expected: PASS, 21 tests.
 
 If `applyCrossFieldRules` produces a type error, replace it by duplicating the two `.refine(...)` calls onto `applicationFields` and onto `applicationFields.extend({ id: ... })` directly — the behaviour the tests assert is what matters, not the helper.
 
