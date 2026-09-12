@@ -3859,7 +3859,7 @@ git commit -m "docs: describe Phase 2 in the README"
 | §11.5 shared ActionResult | Task 2 |
 
 **Gaps found and closed during review:**
-- The spec's Table view promised **sorting**; the plan implements status filtering and a fixed `updatedAt` order only. Sorting is intentionally dropped rather than half-specified — it would need sort links, a whitelist of sortable columns, and server-side ordering across six columns, which is its own task's worth of work and was not worth expanding this plan for. **This is a deliberate reduction of spec scope and needs the product owner's agreement.**
+- The spec's Table view promised **sorting**; the plan implements status filtering and a fixed `updatedAt` order only. Sorting is intentionally dropped rather than half-specified — it would need sort links, a whitelist of sortable columns, and server-side ordering across six columns, which is its own task's worth of work and was not worth expanding this plan for. **Agreed with the product owner on 2026-09-12: build without sorting and revisit once the table has real use.** Spec §7's sorting promise therefore remains outstanding work, tracked here rather than silently dropped — it is the first candidate for a Phase 2.1 follow-up.
 - The spec listed `command`, `popover`, `calendar`, and `tabs` primitives; the Deviations section above records why each was dropped and what replaces it.
 - `ApplicationTable` is consumed by the company detail page (Task 13) before it is created (Task 15). Task 13 Step 5 states the dependency explicitly.
 
