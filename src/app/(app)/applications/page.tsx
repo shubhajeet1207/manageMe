@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
 import { Button } from "@/components/ui/button"
+import { ApplicationBoard } from "./application-board"
 import { ApplicationSheet } from "./application-sheet"
 import { ApplicationTable } from "./application-table"
 import { ViewToggle } from "./view-toggle"
@@ -65,7 +66,9 @@ export default async function ApplicationsPage({
         </div>
       ) : view === "table" ? (
         <ApplicationTable applications={applications} companies={companies} />
-      ) : null}
+      ) : (
+        <ApplicationBoard applications={applications} />
+      )}
     </div>
   )
 }
