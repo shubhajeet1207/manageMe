@@ -22,7 +22,13 @@
 - **No `position` field and no within-column ordering.** Board cards sort by `updatedAt` descending.
 - Deleting a company that still has applications is **refused**, not cascaded.
 - This project has **no `middleware.ts`** — Next.js 16 renamed it. Route protection lives in `src/proxy.ts`, which gates in two places that must stay in sync: the `startsWith` checks in the handler body **and** the `config.matcher` array.
-- shadcn components here are built on **Base UI** (`@base-ui/react`), not Radix. They use a `render={<Element/>}` prop, **not** `asChild`. Follow the patterns in the already-generated `src/components/ui/*` files.
+- **This project's shadcn components are MIXED across two primitive libraries — verified, not assumed:**
+  - **Base UI** (`@base-ui/react`): `sheet`, `dropdown-menu`, `tooltip`, `sidebar` → use `render={<Element/>}`
+  - **Radix** (`radix-ui`): `select`, `alert-dialog`, `badge` (Slot only) → use `asChild`
+  - Plain HTML, no primitive: `table`, `textarea`, `input`, `label`, `card`, `skeleton`
+
+  So `SheetTrigger` takes `render={trigger}` but `AlertDialogTrigger` takes `asChild` with the trigger as a child. Getting these backwards fails at build time. Always check the component's own import line before using it.
+- All `src/components/ui/*` files must import `cn` from `@/lib/utils`. The shadcn CLI may generate `import { cn } from "cn"` against a separate npm package — normalise it; the project already has `cn` in `@/lib/utils` and a second source is redundant.
 - All DB-touching tests run against the real database in `DATABASE_URL` and must clean up every row they create. Deleting a test `User` cascades to its companies and applications, so cleaning up users is sufficient.
 - Zod 4 is installed. `z.enum(PrismaEnumObject)`, `.refine({ path: [...] })`, `z.coerce.number()`, `z.coerce.date()`, and `error.flatten().fieldErrors` are all verified working — match Phase 1's existing style (`z.string().email()`, `z.string().url()`).
 - No comments explaining *what* code does — only where a non-obvious *why* exists.
@@ -2367,7 +2373,7 @@ export function CompanySheet({
 }
 ```
 
-If `SheetTrigger` does not accept `render` in the generated file, check `src/components/ui/sheet.tsx` — Base UI components in this project take `render={<Element/>}`. Pass the trigger element through whichever prop that file exposes.
+`SheetTrigger` here IS Base UI (`sheet.tsx` imports `@base-ui/react/dialog`), so `render={trigger}` is correct. Do not convert it to `asChild` — that is the Radix idiom, used in this project only by `select` and `alert-dialog`.
 
 - [ ] **Step 2: Mount the create trigger on the page**
 
@@ -2507,13 +2513,11 @@ export function DeleteCompanyDialog({
         if (!next) setError(null)
       }}
     >
-      <AlertDialogTrigger
-        render={
-          <Button variant="ghost" size="sm">
-            Delete
-          </Button>
-        }
-      />
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          Delete
+        </Button>
+      </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {companyName}?</AlertDialogTitle>
@@ -3418,13 +3422,11 @@ export function DeleteApplicationDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger
-        render={
-          <Button variant="ghost" size="sm">
-            Delete
-          </Button>
-        }
-      />
+      <AlertDialogTrigger asChild>
+        <Button variant="ghost" size="sm">
+          Delete
+        </Button>
+      </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {label}?</AlertDialogTitle>
