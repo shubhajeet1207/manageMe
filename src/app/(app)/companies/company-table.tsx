@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table"
 import type { CompanyWithCount } from "@/server/repositories/company-repository"
 import { CompanySheet } from "./company-sheet"
+import { DeleteCompanyDialog } from "./delete-company-dialog"
 
 export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
   return (
@@ -21,7 +22,7 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
             <TableHead>Website</TableHead>
             <TableHead>Location</TableHead>
             <TableHead className="text-right">Applications</TableHead>
-            <TableHead className="w-24 text-right">Actions</TableHead>
+            <TableHead className="w-40 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -57,6 +58,7 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
                     </Button>
                   }
                 />
+                <DeleteCompanyDialog companyId={company.id} companyName={company.name} />
               </TableCell>
             </TableRow>
           ))}
