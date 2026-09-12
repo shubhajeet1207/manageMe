@@ -1,10 +1,15 @@
 # ManageMe
 
-A personal career & productivity management platform. This repo currently
-implements Phase 1 (Foundation) — see
-`docs/superpowers/specs/2026-08-24-phase1-foundation-design.md` for the
-full design and `docs/superpowers/plans/2026-08-24-phase1-foundation.md`
-for how it was built.
+A personal career & productivity management platform.
+
+Implemented so far:
+
+- **Phase 1 — Foundation:** auth (sign up, log in, profile, password), app
+  shell, design system.
+  See `docs/superpowers/specs/2026-08-24-phase1-foundation-design.md`.
+- **Phase 2 — Core career:** companies, applications, a seven-stage status
+  pipeline, a drag-and-drop board and a sortable table.
+  See `docs/superpowers/specs/2026-09-12-phase2-core-career-design.md`.
 
 ## Local setup
 
