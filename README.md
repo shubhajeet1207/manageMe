@@ -14,7 +14,9 @@ for how it was built.
      [Neon](https://neon.tech) project works well for local dev)
    - `AUTH_SECRET` — generate with `pnpm dlx auth secret`
    - `NEXT_PUBLIC_APP_URL` — `http://localhost:3000` for local dev
-3. Apply the database schema: `pnpm dlx prisma migrate dev`
+3. Apply the database schema: `pnpm exec prisma migrate dev` (use `pnpm exec`, not
+   `pnpm dlx` — `dlx` fetches a newer Prisma CLI whose commands differ from the
+   version this project pins)
 4. Start the dev server: `pnpm dev`
 
 ## Testing
