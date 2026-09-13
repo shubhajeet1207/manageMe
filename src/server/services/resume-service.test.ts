@@ -11,17 +11,27 @@ import {
   ResumeInUseError,
   ResumeNameTakenError,
   ResumeNotFoundError,
+  ResumeProjectNotFoundError,
   ResumeVersionNotFoundError,
   ResumeVersionNotOwnedError,
+  assertResumeOwned,
   assertResumeVersionOwned,
   createResume,
+  createResumeProject,
   deleteResume,
+  deleteResumeProject,
   getResume,
+  getResumeDetail,
+  getResumeProject,
   getVersionForDownload,
+  listResumeProjects,
   listResumes,
   readVersionFile,
+  reorderResumeProjects,
   setCurrentVersion,
+  setResumeSkills,
   updateResume,
+  updateResumeProject,
   uploadResumeVersion,
 } from "./resume-service"
 
@@ -519,5 +529,180 @@ describe("assertResumeVersionOwned", () => {
     await expect(assertResumeVersionOwned(other.id, owner.version.id)).rejects.toBeInstanceOf(
       ResumeVersionNotOwnedError
     )
+  })
+})
+
+/** A user with a bare resume slot: no upload, because skills and projects hang
+ *  off the slot and never touch a file. */
+async function makeUserWithSlot(name = "Backend SWE") {
+  const user = await makeUser()
+  const resume = await createResume(user.id, { name })
+  return { user, resume }
+}
+
+describe("setResumeSkills", () => {
+  it("replaces a slot's skills", async () => {
+    const { user, resume } = await makeUserWithSlot()
+
+    const updated = await setResumeSkills(user.id, resume.id, ["Go", "Kubernetes"])
+    expect(updated.skills).toEqual(["Go", "Kubernetes"])
+    expect((await setResumeSkills(user.id, resume.id, [])).skills).toEqual([])
+  })
+
+  it("refuses another user's slot, leaving its skills unchanged", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    await setResumeSkills(owner.user.id, owner.resume.id, ["Go"])
+
+    await expect(setResumeSkills(other.id, owner.resume.id, ["Hacked"])).rejects.toBeInstanceOf(
+      ResumeNotFoundError
+    )
+    expect((await getResume(owner.user.id, owner.resume.id)).skills).toEqual(["Go"])
+  })
+})
+
+describe("resume projects", () => {
+  it("creates, reads and lists a project on the caller's own slot", async () => {
+    const { user, resume } = await makeUserWithSlot()
+
+    const project = await createResumeProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+      description: "Moved double-entry posting off the monolith",
+      url: "https://example.com/ledger",
+    })
+
+    expect(project.position).toBe(0)
+    expect((await getResumeProject(user.id, project.id)).name).toBe("Ledger rewrite")
+    expect((await listResumeProjects(user.id, resume.id)).map((p) => p.id)).toEqual([project.id])
+  })
+
+  it("clears a description and a url when they are removed", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await createResumeProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+      description: "Shipped in March",
+      url: "https://example.com/ledger",
+    })
+
+    // Prisma reads `undefined` as "leave unchanged", so clearing an optional
+    // field is a silent no-op unless it is mapped to null.
+    const updated = await updateResumeProject(user.id, project.id, { name: "Ledger rewrite" })
+    expect(updated.description).toBeNull()
+    expect(updated.url).toBeNull()
+  })
+
+  it("deletes a project, and refuses a second delete with the same error as a missing one", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await createResumeProject(user.id, { resumeId: resume.id, name: "Ledger" })
+
+    await expect(deleteResumeProject(user.id, project.id)).resolves.toBeUndefined()
+    await expect(deleteResumeProject(user.id, project.id)).rejects.toBeInstanceOf(
+      ResumeProjectNotFoundError
+    )
+    await expect(getResumeProject(user.id, "does-not-exist")).rejects.toBeInstanceOf(
+      ResumeProjectNotFoundError
+    )
+  })
+
+  it("reorders a slot's projects", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const first = await createResumeProject(user.id, { resumeId: resume.id, name: "Ledger" })
+    const second = await createResumeProject(user.id, { resumeId: resume.id, name: "Indexer" })
+
+    const reordered = await reorderResumeProjects(user.id, resume.id, [second.id, first.id])
+    expect(reordered.map((p) => p.id)).toEqual([second.id, first.id])
+  })
+
+  it("refuses an order that is not exactly the slot's own projects", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    await createResumeProject(user.id, { resumeId: resume.id, name: "Ledger" })
+
+    await expect(
+      reorderResumeProjects(user.id, resume.id, ["does-not-exist"])
+    ).rejects.toBeInstanceOf(ResumeProjectNotFoundError)
+  })
+
+  it("refuses to read, update or delete another user's project, all with the same error", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const project = await createResumeProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+    })
+
+    await expect(getResumeProject(other.id, project.id)).rejects.toBeInstanceOf(
+      ResumeProjectNotFoundError
+    )
+    await expect(
+      updateResumeProject(other.id, project.id, { name: "Hacked" })
+    ).rejects.toBeInstanceOf(ResumeProjectNotFoundError)
+    await expect(deleteResumeProject(other.id, project.id)).rejects.toBeInstanceOf(
+      ResumeProjectNotFoundError
+    )
+
+    expect((await getResumeProject(owner.user.id, project.id)).name).toBe("Ledger rewrite")
+  })
+
+  it("carries the slot's skills and projects on the detail page payload", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    await setResumeSkills(user.id, resume.id, ["Go"])
+    const project = await createResumeProject(user.id, { resumeId: resume.id, name: "Ledger" })
+
+    const detail = await getResumeDetail(user.id, resume.id)
+    expect(detail.resume.skills).toEqual(["Go"])
+    expect(detail.projects.map((p) => p.id)).toEqual([project.id])
+  })
+})
+
+describe("assertResumeOwned", () => {
+  it("accepts a slot the caller owns", async () => {
+    const { user, resume } = await makeUserWithSlot()
+
+    await expect(assertResumeOwned(user.id, resume.id)).resolves.toBeUndefined()
+  })
+
+  it("is what stops a project being hung off another user's resume", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+
+    await expect(
+      createResumeProject(other.id, { resumeId: owner.resume.id, name: "Injected" })
+    ).rejects.toBeInstanceOf(ResumeNotFoundError)
+
+    // Repository scoping cannot catch this one: the row would carry the
+    // CALLER'S OWN userId alongside someone else's resumeId, so every
+    // `where: { userId }` clause on the write still matches and the foreign
+    // key is satisfied. This query is deliberately NOT scoped by user — remove
+    // the guard and the row is here.
+    expect(
+      await prisma.resumeProject.findMany({ where: { resumeId: owner.resume.id } })
+    ).toHaveLength(0)
+  })
+
+  it("refuses to reorder another user's slot, writing nothing", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const project = await createResumeProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger",
+    })
+
+    await expect(
+      reorderResumeProjects(other.id, owner.resume.id, [project.id])
+    ).rejects.toBeInstanceOf(ResumeNotFoundError)
+    expect((await getResumeProject(owner.user.id, project.id)).position).toBe(0)
+  })
+
+  it("answers a foreign slot and a missing one identically", async () => {
+    const owner = await makeUserWithSlot()
+    const user = await makeUser()
+
+    const notYours = await assertResumeOwned(user.id, owner.resume.id).catch((error) => error)
+    const notThere = await assertResumeOwned(user.id, "does-not-exist").catch((error) => error)
+    expect(notYours.constructor).toBe(notThere.constructor)
+    expect(notYours.message).toBe(notThere.message)
+    expect(notYours.message).toBe("Resume not found")
   })
 })

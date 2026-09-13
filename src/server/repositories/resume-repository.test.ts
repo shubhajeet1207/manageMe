@@ -371,3 +371,342 @@ describe("ownership", () => {
     expect(await resumeRepository.countApplicationsForResume(owner.user.id, owner.resume.id)).toBe(0)
   })
 })
+
+/** A user with a bare resume slot: no version, because skills and projects
+ *  hang off the slot and never touch a file. */
+async function makeUserWithSlot(name = "Backend SWE") {
+  const user = await makeUser()
+  const resume = await resumeRepository.create(user.id, { name })
+  return { user, resume }
+}
+
+describe("resume skills", () => {
+  it("starts empty on a new slot", async () => {
+    const user = await makeUser()
+    const resume = await resumeRepository.create(user.id, { name: "Backend SWE" })
+
+    // The column is additive and defaulted, so a row written without skills —
+    // including every row that existed before the migration — reads as [].
+    expect(resume.skills).toEqual([])
+    expect((await resumeRepository.findById(user.id, resume.id))?.skills).toEqual([])
+  })
+
+  it("sets skills for its owner", async () => {
+    const user = await makeUser()
+    const resume = await resumeRepository.create(user.id, { name: "Backend SWE" })
+
+    const updated = await resumeRepository.setSkills(user.id, resume.id, ["Go", "Kubernetes"])
+    expect(updated?.skills).toEqual(["Go", "Kubernetes"])
+  })
+
+  it("replaces the list rather than merging into it", async () => {
+    const user = await makeUser()
+    const resume = await resumeRepository.create(user.id, { name: "Backend SWE" })
+    await resumeRepository.setSkills(user.id, resume.id, ["Go", "Kubernetes"])
+
+    const updated = await resumeRepository.setSkills(user.id, resume.id, ["Rust"])
+    expect(updated?.skills).toEqual(["Rust"])
+  })
+
+  it("clears every skill with an empty list", async () => {
+    const user = await makeUser()
+    const resume = await resumeRepository.create(user.id, { name: "Backend SWE" })
+    await resumeRepository.setSkills(user.id, resume.id, ["Go"])
+
+    expect((await resumeRepository.setSkills(user.id, resume.id, []))?.skills).toEqual([])
+  })
+
+  it("is queryable by tag, which is why it is an array and not a join table", async () => {
+    const user = await makeUser()
+    const resume = await resumeRepository.create(user.id, { name: "Backend SWE" })
+    await resumeRepository.setSkills(user.id, resume.id, ["Go", "Kubernetes"])
+
+    const matched = await prisma.resume.findMany({
+      where: { userId: user.id, skills: { has: "Kubernetes" } },
+    })
+    expect(matched.map((r) => r.id)).toEqual([resume.id])
+    expect(
+      await prisma.resume.findMany({ where: { userId: user.id, skills: { has: "COBOL" } } })
+    ).toHaveLength(0)
+  })
+})
+
+describe("resume projects", () => {
+  it("appends projects, numbering each one after the last", async () => {
+    const { user, resume } = await makeUserWithSlot()
+
+    const first = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+    const second = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Search indexer",
+    })
+
+    expect(first.position).toBe(0)
+    expect(second.position).toBe(1)
+  })
+
+  it("stores a description and a url", async () => {
+    const { user, resume } = await makeUserWithSlot()
+
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+      description: "Moved double-entry posting off the monolith",
+      url: "https://example.com/ledger",
+    })
+
+    expect(project.description).toBe("Moved double-entry posting off the monolith")
+    expect(project.url).toBe("https://example.com/ledger")
+  })
+
+  it("lists projects in position order", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const first = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+    const second = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Search indexer",
+    })
+
+    const listed = await resumeRepository.listProjects(user.id, resume.id)
+    expect(listed.map((p) => p.id)).toEqual([first.id, second.id])
+  })
+
+  it("lists only the projects of the slot asked for", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const other = await resumeRepository.create(user.id, { name: "Data roles" })
+    await resumeRepository.createProject(user.id, { resumeId: resume.id, name: "Ledger rewrite" })
+    await resumeRepository.createProject(user.id, { resumeId: other.id, name: "Warehouse" })
+
+    expect(await resumeRepository.listProjects(user.id, resume.id)).toHaveLength(1)
+    expect(await resumeRepository.listProjects(user.id, other.id)).toHaveLength(1)
+  })
+
+  it("finds a project by id for its owner", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+
+    expect((await resumeRepository.findProjectById(user.id, project.id))?.name).toBe(
+      "Ledger rewrite"
+    )
+  })
+
+  it("updates a project for its owner", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+
+    const updated = await resumeRepository.updateProject(user.id, project.id, {
+      name: "Ledger rewrite (2026)",
+      description: "Shipped in March",
+      url: "https://example.com/ledger",
+    })
+    expect(updated?.name).toBe("Ledger rewrite (2026)")
+    expect(updated?.description).toBe("Shipped in March")
+    expect(updated?.url).toBe("https://example.com/ledger")
+  })
+
+  it("clears a description and a url when they are removed", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+      description: "Shipped in March",
+      url: "https://example.com/ledger",
+    })
+
+    const updated = await resumeRepository.updateProject(user.id, project.id, {
+      name: "Ledger rewrite",
+    })
+    // Prisma reads `undefined` as "leave unchanged", so these have to be mapped
+    // to null explicitly or a cleared field would silently never clear.
+    expect(updated?.description).toBeNull()
+    expect(updated?.url).toBeNull()
+  })
+
+  it("keeps a project's position when it is updated", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    await resumeRepository.createProject(user.id, { resumeId: resume.id, name: "Ledger rewrite" })
+    const second = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Search indexer",
+    })
+
+    const updated = await resumeRepository.updateProject(user.id, second.id, { name: "Indexer" })
+    expect(updated?.position).toBe(1)
+  })
+
+  it("deletes a project for its owner", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+
+    expect(await resumeRepository.removeProject(user.id, project.id)).toBe(true)
+    expect(await resumeRepository.findProjectById(user.id, project.id)).toBeNull()
+  })
+
+  it("takes its projects with it when the slot is deleted", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const project = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+
+    await resumeRepository.remove(user.id, resume.id)
+    expect(await resumeRepository.findProjectById(user.id, project.id)).toBeNull()
+  })
+
+  it("renumbers projects into the order given", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const first = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+    const second = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Search indexer",
+    })
+
+    expect(
+      await resumeRepository.reorderProjects(user.id, resume.id, [second.id, first.id])
+    ).toBe(true)
+    const listed = await resumeRepository.listProjects(user.id, resume.id)
+    expect(listed.map((p) => p.id)).toEqual([second.id, first.id])
+    expect(listed.map((p) => p.position)).toEqual([0, 1])
+  })
+
+  it("refuses a partial or a repeated order, and writes nothing", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const first = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+    const second = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Search indexer",
+    })
+
+    // A partial list would leave stale positions; a repeated id would collapse
+    // two projects onto one.
+    expect(await resumeRepository.reorderProjects(user.id, resume.id, [second.id])).toBe(false)
+    expect(await resumeRepository.reorderProjects(user.id, resume.id, [first.id, first.id])).toBe(
+      false
+    )
+
+    const listed = await resumeRepository.listProjects(user.id, resume.id)
+    expect(listed.map((p) => p.id)).toEqual([first.id, second.id])
+  })
+
+  it("refuses an order carrying another user's project id", async () => {
+    const { user, resume } = await makeUserWithSlot()
+    const other = await makeUserWithSlot("Data roles")
+    const own = await resumeRepository.createProject(user.id, {
+      resumeId: resume.id,
+      name: "Ledger rewrite",
+    })
+    const foreign = await resumeRepository.createProject(other.user.id, {
+      resumeId: other.resume.id,
+      name: "Warehouse",
+    })
+
+    expect(await resumeRepository.reorderProjects(user.id, resume.id, [own.id, foreign.id])).toBe(
+      false
+    )
+    expect(await resumeRepository.findProjectById(other.user.id, foreign.id)).not.toBeNull()
+  })
+})
+
+describe("ownership of skills and projects", () => {
+  it("does not set skills on another user's resume, and leaves them unchanged", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    await resumeRepository.setSkills(owner.user.id, owner.resume.id, ["Go"])
+
+    expect(await resumeRepository.setSkills(other.id, owner.resume.id, ["Hacked"])).toBeNull()
+    expect((await resumeRepository.findById(owner.user.id, owner.resume.id))?.skills).toEqual(["Go"])
+  })
+
+  it("does not list another user's projects", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+    })
+
+    expect(await resumeRepository.listProjects(other.id, owner.resume.id)).toHaveLength(0)
+  })
+
+  it("does not find another user's project by id", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const project = await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+    })
+
+    expect(await resumeRepository.findProjectById(other.id, project.id)).toBeNull()
+  })
+
+  it("does not update another user's project, and leaves it unchanged", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const project = await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+      description: "Shipped in March",
+    })
+
+    expect(
+      await resumeRepository.updateProject(other.id, project.id, { name: "Hacked" })
+    ).toBeNull()
+
+    const untouched = await resumeRepository.findProjectById(owner.user.id, project.id)
+    expect(untouched?.name).toBe("Ledger rewrite")
+    expect(untouched?.description).toBe("Shipped in March")
+  })
+
+  it("does not delete another user's project", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const project = await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+    })
+
+    expect(await resumeRepository.removeProject(other.id, project.id)).toBe(false)
+    expect(await resumeRepository.findProjectById(owner.user.id, project.id)).not.toBeNull()
+  })
+
+  it("does not reorder another user's projects", async () => {
+    const owner = await makeUserWithSlot()
+    const other = await makeUser()
+    const first = await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Ledger rewrite",
+    })
+    const second = await resumeRepository.createProject(owner.user.id, {
+      resumeId: owner.resume.id,
+      name: "Search indexer",
+    })
+
+    expect(
+      await resumeRepository.reorderProjects(other.id, owner.resume.id, [second.id, first.id])
+    ).toBe(false)
+    expect(
+      (await resumeRepository.listProjects(owner.user.id, owner.resume.id)).map((p) => p.id)
+    ).toEqual([first.id, second.id])
+  })
+})

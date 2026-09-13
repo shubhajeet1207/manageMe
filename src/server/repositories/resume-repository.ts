@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/prisma"
-import type { Application, Company, Resume, ResumeVersion } from "@prisma/client"
+import type { Application, Company, Resume, ResumeProject, ResumeVersion } from "@prisma/client"
 import type { CreateResumeInput } from "@/server/validators/resume-schemas"
 
 /**
@@ -253,4 +253,129 @@ export async function statsByResume(userId: string): Promise<Map<string, ResumeS
   }
 
   return stats
+}
+
+export type ResumeProjectData = {
+  name: string
+  description?: string
+  url?: string
+}
+
+export type NewResumeProjectData = ResumeProjectData & { resumeId: string }
+
+/**
+ * Replace a slot's skill tags. Null when the slot is not the caller's,
+ * including when it does not exist, writing nothing in that case.
+ */
+export async function setSkills(
+  userId: string,
+  resumeId: string,
+  skills: string[]
+): Promise<Resume | null> {
+  const { count } = await prisma.resume.updateMany({
+    where: { id: resumeId, userId },
+    data: { skills },
+  })
+  if (count === 0) return null
+  return prisma.resume.findFirst({ where: { id: resumeId, userId } })
+}
+
+export function listProjects(userId: string, resumeId: string): Promise<ResumeProject[]> {
+  return prisma.resumeProject.findMany({
+    where: { userId, resumeId },
+    // createdAt breaks a tie rather than leaving two equal positions to the
+    // planner, which is free to return them in either order between queries.
+    orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+  })
+}
+
+export function findProjectById(userId: string, id: string): Promise<ResumeProject | null> {
+  return prisma.resumeProject.findFirst({ where: { id, userId } })
+}
+
+/**
+ * Append a project to a slot.
+ *
+ * `resumeId` is client-supplied and this write carries the caller's OWN
+ * userId, so no `where: { userId }` clause anywhere can refuse a foreign slot.
+ * `assertResumeOwned` in resume-service.ts is the control; it runs first.
+ */
+export async function createProject(
+  userId: string,
+  data: NewResumeProjectData
+): Promise<ResumeProject> {
+  return prisma.$transaction(async (tx) => {
+    const last = await tx.resumeProject.findFirst({
+      where: { userId, resumeId: data.resumeId },
+      orderBy: { position: "desc" },
+      select: { position: true },
+    })
+    return tx.resumeProject.create({
+      data: {
+        userId,
+        resumeId: data.resumeId,
+        name: data.name,
+        description: data.description ?? null,
+        url: data.url ?? null,
+        position: last ? last.position + 1 : 0,
+      },
+    })
+  })
+}
+
+export async function updateProject(
+  userId: string,
+  id: string,
+  data: ResumeProjectData
+): Promise<ResumeProject | null> {
+  // `?? null` on every optional field: Prisma reads `undefined` as "leave
+  // unchanged", so a cleared description or url would silently never clear —
+  // the same trap fixed in application-repository.ts.
+  const { count } = await prisma.resumeProject.updateMany({
+    where: { id, userId },
+    data: {
+      name: data.name,
+      description: data.description ?? null,
+      url: data.url ?? null,
+    },
+  })
+  if (count === 0) return null
+  return prisma.resumeProject.findFirst({ where: { id, userId } })
+}
+
+export async function removeProject(userId: string, id: string): Promise<boolean> {
+  const { count } = await prisma.resumeProject.deleteMany({ where: { id, userId } })
+  return count > 0
+}
+
+/**
+ * Renumber a slot's projects to the given order, in one transaction.
+ *
+ * False — writing nothing — unless `projectIds` is exactly the set of projects
+ * the caller owns on that slot: a partial list would leave stale positions, a
+ * repeated id would collapse two projects onto one position, and a foreign id
+ * is simply not theirs. All four refusals are the same answer.
+ */
+export async function reorderProjects(
+  userId: string,
+  resumeId: string,
+  projectIds: string[]
+): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.resumeProject.findMany({
+      where: { userId, resumeId },
+      select: { id: true },
+    })
+
+    const owned = new Set(existing.map((project) => project.id))
+    const requested = new Set(projectIds)
+    if (requested.size !== projectIds.length) return false
+    if (owned.size !== requested.size) return false
+    if (!projectIds.every((id) => owned.has(id))) return false
+
+    for (const [position, id] of projectIds.entries()) {
+      await tx.resumeProject.updateMany({ where: { id, userId, resumeId }, data: { position } })
+    }
+    return true
+  })
 }

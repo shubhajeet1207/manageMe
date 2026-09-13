@@ -2,14 +2,18 @@ import { randomUUID } from "node:crypto"
 import * as resumeRepository from "@/server/repositories/resume-repository"
 import type {
   ApplicationWithCompanyAndVersion,
+  ResumeProjectData,
   ResumeStats,
   ResumeVersionWithResume,
   ResumeWithCurrentVersion,
 } from "@/server/repositories/resume-repository"
 import { getStorage } from "@/server/storage"
 import { PDF_CONTENT_TYPE, validatePdfUpload } from "@/server/files/pdf"
-import type { CreateResumeInput } from "@/server/validators/resume-schemas"
-import type { Resume, ResumeVersion } from "@prisma/client"
+import type {
+  CreateResumeInput,
+  CreateResumeProjectInput,
+} from "@/server/validators/resume-schemas"
+import type { Resume, ResumeProject, ResumeVersion } from "@prisma/client"
 
 export class ResumeNameTakenError extends Error {
   constructor() {
@@ -33,6 +37,13 @@ export class ResumeInUseError extends Error {
       } first.`
     )
     this.name = "ResumeInUseError"
+  }
+}
+
+export class ResumeProjectNotFoundError extends Error {
+  constructor() {
+    super("Project not found")
+    this.name = "ResumeProjectNotFoundError"
   }
 }
 
@@ -82,6 +93,7 @@ export type ResumeLibraryItem = ResumeWithCurrentVersion & { stats: ResumeStats 
 export type ResumeDetail = {
   resume: ResumeWithCurrentVersion
   versions: ResumeVersion[]
+  projects: ResumeProject[]
   applications: ApplicationWithCompanyAndVersion[]
   stats: ResumeStats
 }
@@ -147,12 +159,13 @@ export async function getResume(userId: string, id: string): Promise<ResumeWithC
 /** Everything the detail page renders, in one place. */
 export async function getResumeDetail(userId: string, id: string): Promise<ResumeDetail> {
   const resume = await getResume(userId, id)
-  const [versions, applications, stats] = await Promise.all([
+  const [versions, projects, applications, stats] = await Promise.all([
     resumeRepository.listVersions(userId, id),
+    resumeRepository.listProjects(userId, id),
     resumeRepository.listApplicationsForResume(userId, id),
     resumeRepository.statsByResume(userId),
   ])
-  return { resume, versions, applications, stats: stats.get(id) ?? { ...EMPTY_STATS } }
+  return { resume, versions, projects, applications, stats: stats.get(id) ?? { ...EMPTY_STATS } }
 }
 
 export async function createResume(userId: string, input: CreateResumeInput): Promise<Resume> {
@@ -344,4 +357,82 @@ export async function readVersionFile(
   }
 
   return { version, bytes }
+}
+
+/**
+ * The twin of `assertResumeVersionOwned`, one entity over, and it exists for
+ * the same reason repository scoping cannot cover: creating a project writes a
+ * row carrying the CALLER'S OWN userId alongside a client-supplied `resumeId`,
+ * so every `where: { userId }` clause on the write still matches. Without this
+ * check a user could hang a project off another user's resume.
+ *
+ * It throws `ResumeNotFoundError` rather than a distinct error so a foreign
+ * slot and a missing one are the same answer.
+ */
+export async function assertResumeOwned(userId: string, resumeId: string): Promise<void> {
+  const resume = await resumeRepository.findById(userId, resumeId)
+  if (!resume) throw new ResumeNotFoundError()
+}
+
+/** Replace a slot's skill tags. The list is authoritative: what is not in it
+ *  is removed. */
+export async function setResumeSkills(
+  userId: string,
+  resumeId: string,
+  skills: string[]
+): Promise<Resume> {
+  const updated = await resumeRepository.setSkills(userId, resumeId, skills)
+  if (!updated) throw new ResumeNotFoundError()
+  return updated
+}
+
+export function listResumeProjects(userId: string, resumeId: string): Promise<ResumeProject[]> {
+  return resumeRepository.listProjects(userId, resumeId)
+}
+
+export async function getResumeProject(userId: string, id: string): Promise<ResumeProject> {
+  const project = await resumeRepository.findProjectById(userId, id)
+  if (!project) throw new ResumeProjectNotFoundError()
+  return project
+}
+
+export async function createResumeProject(
+  userId: string,
+  input: CreateResumeProjectInput
+): Promise<ResumeProject> {
+  await assertResumeOwned(userId, input.resumeId)
+  return resumeRepository.createProject(userId, input)
+}
+
+export async function updateResumeProject(
+  userId: string,
+  id: string,
+  input: ResumeProjectData
+): Promise<ResumeProject> {
+  const updated = await resumeRepository.updateProject(userId, id, input)
+  if (!updated) throw new ResumeProjectNotFoundError()
+  return updated
+}
+
+export async function deleteResumeProject(userId: string, id: string): Promise<void> {
+  const deleted = await resumeRepository.removeProject(userId, id)
+  if (!deleted) throw new ResumeProjectNotFoundError()
+}
+
+/**
+ * Renumber a slot's projects. `projectIds` must be exactly that slot's
+ * projects, so a list assembled from a stale page refuses rather than writing
+ * half an order.
+ */
+export async function reorderResumeProjects(
+  userId: string,
+  resumeId: string,
+  projectIds: string[]
+): Promise<ResumeProject[]> {
+  await assertResumeOwned(userId, resumeId)
+
+  const ok = await resumeRepository.reorderProjects(userId, resumeId, projectIds)
+  if (!ok) throw new ResumeProjectNotFoundError()
+
+  return resumeRepository.listProjects(userId, resumeId)
 }
