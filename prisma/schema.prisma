@@ -20,6 +20,12 @@ model User {
   resumes        Resume[]
   resumeVersions ResumeVersion[]
   resumeProjects ResumeProject[]
+  documents      Document[]
+  projects       Project[]
+  tasks          Task[]
+  links          Link[]
+  quickDropItems QuickDropItem[]
+  credentials    Credential[]
 }
 
 enum ApplicationStatus {
@@ -50,6 +56,7 @@ model Company {
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   applications Application[]
+  documents    Document[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -84,6 +91,7 @@ model Application {
   // too late. The service checks the count first and raises ResumeInUseError;
   // this constraint is the backstop, not the messenger.
   resumeVersion ResumeVersion? @relation(fields: [resumeVersionId], references: [id], onDelete: Restrict)
+  tasks         Task[]
 
   @@index([userId, status])
   @@index([userId, companyId])
@@ -175,4 +183,179 @@ model ResumeProject {
   resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
 
   @@index([userId, resumeId, position])
+}
+
+/// A career document held in the vault — an offer letter, a payslip, a
+/// certificate, an ID proof, a contract. One row, one file: there is no version
+/// history here, because versioning is the resume system's job (Phase 4 §3).
+model Document {
+  id               String    @id @default(cuid())
+  userId           String
+  title            String
+  description      String?
+  /// Short free-text tags with no attributes of their own, so a Postgres
+  /// array rather than a join table — the same shape and the same reasoning
+  /// as Resume.skills (§9.2). Defaulted so the column reads as an empty list.
+  tags             String[]  @default([])
+  /// Optional: an ID proof or a certificate that stops being valid. Drives a
+  /// badge computed at render time and nothing else — there are no reminders.
+  expiresOn        DateTime?
+  /// Which company this came from, when it came from one. Client-supplied and
+  /// guarded by assertCompanyOwned (§5.1b), never by repository scoping.
+  companyId        String?
+  /// Display metadata only. It is NEVER part of a storage key (§8.4).
+  originalFilename String
+  /// Stored, not derived: the row is the record of where the bytes are.
+  /// Unique so two rows can never claim the same object.
+  storageKey       String    @unique
+  /// Validated against the registry at write time, and looked up in the
+  /// registry — never echoed — when serving (§8.6).
+  contentType      String
+  sizeBytes        Int
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // SetNull, not Restrict: a document is a complete artifact on its own and the
+  // company is an optional label on it. Deleting a company must not refuse, and
+  // must not destroy a payslip (§6).
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, companyId])
+  @@index([tags(ops: ArrayOps)], type: Gin)
+}
+
+enum ProjectStatus {
+  IDEA
+  ACTIVE
+  PAUSED
+  DONE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+/// A piece of work the user is doing ("Portfolio site", "Learn Rust") — not a
+/// job application, and deliberately not linked to ResumeProject (§7.2).
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      ProjectStatus @default(ACTIVE)
+  url         String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@unique([userId, name])
+  @@index([userId, status])
+}
+
+model Task {
+  id            String     @id @default(cuid())
+  userId        String
+  title         String
+  notes         String?
+  status        TaskStatus @default(TODO)
+  /// A calendar date, not an instant. Stored as a Postgres DATE and
+  /// always read and written at UTC midnight — see §7.5.
+  dueDate       DateTime?  @db.Date
+  /// Set by the service when status becomes DONE, cleared when it leaves.
+  /// Never accepted from the client. `updatedAt` cannot answer "what did I
+  /// finish last week" because any edit moves it.
+  completedAt   DateTime?
+  projectId     String?
+  applicationId String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Both SetNull: deleting something a task points at never deletes the task
+  // (§7.4). It loses context, not the sentence the user typed.
+  project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status, dueDate])
+  @@index([userId, projectId])
+  @@index([userId, applicationId])
+}
+
+/// A saved reference URL that belongs to nothing else — not an
+/// Application.jobUrl and not a ResumeProject.url (§4.2).
+model Link {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  url         String
+  description String?
+  /// Short free-text tags with no attributes of their own, so a Postgres
+  /// array rather than a join table — the same call Resume.skills made,
+  /// and the same `has`/`hasSome` query shape.
+  tags        String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// An untriaged capture: one line of text or a pasted URL, and nothing
+/// else. It leaves this table by being converted into a Task, Link or
+/// Project, or by being dismissed. There is no edit operation and no
+/// archive — an inbox whose items never leave stops being an inbox.
+model QuickDropItem {
+  id        String   @id @default(cuid())
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// A login for a third-party site. The password is AES-256-GCM
+/// ciphertext and the three secret columns are NON-NULLABLE by design:
+/// there is no representable row that holds a plaintext or absent
+/// secret, so "store it unencrypted instead" is not a state this schema
+/// can reach. See §9.
+model Credential {
+  id               String   @id @default(cuid())
+  userId           String
+  label            String
+  siteUrl          String?
+  /// Plaintext, deliberately: the list view identifies a record by it,
+  /// and encrypting it would force a decrypt on a list render — which is
+  /// the one thing §9.6 forbids. §9.10 states the consequence.
+  username         String?
+  /// Plaintext. The form's help text says so. Not a second secret slot.
+  notes            String?
+  secretCiphertext Bytes
+  /// 12 bytes, fresh on every encryption. Never reused (§9.3).
+  secretNonce      Bytes
+  /// 16 bytes from GCM. Stored separately from the ciphertext because
+  /// Node's API produces and consumes it separately.
+  secretAuthTag    Bytes
+  /// Which key this row is encrypted under: the first 8 bytes of
+  /// SHA-256 over the key, hex. Derived, never configured, so it cannot
+  /// drift from reality the way a hand-maintained version number can.
+  keyId            String
+  /// When the SECRET last changed — not the row. Editing a label must
+  /// not look like a password change.
+  secretUpdatedAt  DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, label])
+  @@index([userId])
 }
