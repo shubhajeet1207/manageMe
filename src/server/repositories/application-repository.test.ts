@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { afterEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/db/prisma"
 import * as applicationRepository from "./application-repository"
@@ -17,11 +18,36 @@ async function makeUserWithCompany() {
   return { user, company }
 }
 
+/** A resume version written directly: these tests are about the link field on
+ *  the application, not about the upload path. */
+async function makeResumeVersion(userId: string) {
+  const resume = await prisma.resume.create({
+    data: { userId, name: `Backend SWE ${randomUUID().slice(0, 8)}` },
+  })
+  return prisma.resumeVersion.create({
+    data: {
+      userId,
+      resumeId: resume.id,
+      label: "October",
+      originalFilename: "resume.pdf",
+      storageKey: `resumes/${userId}/${randomUUID()}.pdf`,
+      contentType: "application/pdf",
+      sizeBytes: 1024,
+    },
+  })
+}
+
 afterEach(async () => {
-  if (createdUserIds.length > 0) {
-    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })
-    createdUserIds.length = 0
-  }
+  if (createdUserIds.length === 0) return
+  const ids = [...createdUserIds]
+  createdUserIds.length = 0
+  // Applications Restrict on resumeVersion, so they go before the versions
+  // they point at rather than relying on the order of a user cascade.
+  await prisma.application.deleteMany({
+    where: { OR: [{ userId: { in: ids } }, { resumeVersion: { userId: { in: ids } } }] },
+  })
+  await prisma.resumeVersion.deleteMany({ where: { userId: { in: ids } } })
+  await prisma.user.deleteMany({ where: { id: { in: ids } } })
 })
 
 describe("applicationRepository", () => {
@@ -175,6 +201,93 @@ describe("applicationRepository", () => {
 
       expect(await applicationRepository.remove(other.user.id, created.id)).toBe(false)
       expect(await applicationRepository.findById(owner.user.id, created.id)).not.toBeNull()
+    })
+  })
+
+  // Prisma treats an `undefined` field as "leave unchanged", not "clear it".
+  // These prove `update` maps a cleared optional field to `null` in the
+  // write rather than dropping it from the `data` object.
+  describe("clearing an optional field", () => {
+    it("unlinks a resume version when resumeVersionId is cleared", async () => {
+      const { user, company } = await makeUserWithCompany()
+      const version = await makeResumeVersion(user.id)
+      const created = await applicationRepository.create(user.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        resumeVersionId: version.id,
+      })
+      expect(created.resumeVersionId).toBe(version.id)
+
+      const updated = await applicationRepository.update(user.id, created.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+      })
+
+      const reread = await applicationRepository.findById(user.id, created.id)
+      expect(updated?.resumeVersionId).toBeNull()
+      expect(reread?.resumeVersionId).toBeNull()
+    })
+
+    it("clears jobUrl when omitted from an update", async () => {
+      const { user, company } = await makeUserWithCompany()
+      const created = await applicationRepository.create(user.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        jobUrl: "https://example.com/job/123",
+      })
+      expect(created.jobUrl).toBe("https://example.com/job/123")
+
+      await applicationRepository.update(user.id, created.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+      })
+
+      const reread = await applicationRepository.findById(user.id, created.id)
+      expect(reread?.jobUrl).toBeNull()
+    })
+
+    it("clears notes when omitted from an update", async () => {
+      const { user, company } = await makeUserWithCompany()
+      const created = await applicationRepository.create(user.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        notes: "Referred by a friend",
+      })
+      expect(created.notes).toBe("Referred by a friend")
+
+      await applicationRepository.update(user.id, created.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+      })
+
+      const reread = await applicationRepository.findById(user.id, created.id)
+      expect(reread?.notes).toBeNull()
+    })
+
+    it("clears salaryMin when omitted from an update", async () => {
+      const { user, company } = await makeUserWithCompany()
+      const created = await applicationRepository.create(user.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        salaryMin: 90000,
+      })
+      expect(created.salaryMin).toBe(90000)
+
+      await applicationRepository.update(user.id, created.id, {
+        companyId: company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+      })
+
+      const reread = await applicationRepository.findById(user.id, created.id)
+      expect(reread?.salaryMin).toBeNull()
     })
   })
 })
