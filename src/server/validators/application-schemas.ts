@@ -68,6 +68,15 @@ const applicationFields = z.object({
   source: optionalText,
   appliedAt: optionalPastDate,
   notes: optionalText,
+  // Which FILE was sent, so the value is a version id, not a resume id. It is
+  // client-supplied and the repository's `userId` scoping cannot vouch for it:
+  // `assertResumeVersionOwned` in application-service.ts does, on create and on
+  // update. "None" submits "" and must land as undefined, never as "".
+  resumeVersionId: z
+    .string()
+    .trim()
+    .transform((value) => (value === "" ? undefined : value))
+    .optional(),
 })
 
 // Cross-field rules are written out on each exported schema rather than

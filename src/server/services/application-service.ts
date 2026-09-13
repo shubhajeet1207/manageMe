@@ -1,6 +1,7 @@
 import * as applicationRepository from "@/server/repositories/application-repository"
 import * as companyRepository from "@/server/repositories/company-repository"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import { assertResumeVersionOwned } from "@/server/services/resume-service"
 import type { CreateApplicationInput } from "@/server/validators/application-schemas"
 import type { Application, ApplicationStatus } from "@prisma/client"
 
@@ -24,6 +25,18 @@ export class CompanyNotOwnedError extends Error {
 async function assertCompanyOwned(userId: string, companyId: string): Promise<void> {
   const company = await companyRepository.findById(userId, companyId)
   if (!company) throw new CompanyNotOwnedError()
+}
+
+// The same hole one entity over: a resumeVersionId in the payload is an
+// arbitrary client-supplied id, and linking someone else's file would have the
+// UI render a link to it. Guarded only when one is supplied — an undefined
+// value means "no resume", and unlinking is always allowed.
+async function assertLinkedResumeVersionOwned(
+  userId: string,
+  resumeVersionId: string | undefined
+): Promise<void> {
+  if (resumeVersionId === undefined) return
+  await assertResumeVersionOwned(userId, resumeVersionId)
 }
 
 export function listApplications(userId: string): Promise<ApplicationWithCompany[]> {
@@ -51,6 +64,7 @@ export async function createApplication(
   input: CreateApplicationInput
 ): Promise<Application> {
   await assertCompanyOwned(userId, input.companyId)
+  await assertLinkedResumeVersionOwned(userId, input.resumeVersionId)
   return applicationRepository.create(userId, input)
 }
 
@@ -63,6 +77,7 @@ export async function updateApplication(
   if (!existing) throw new ApplicationNotFoundError()
 
   await assertCompanyOwned(userId, input.companyId)
+  await assertLinkedResumeVersionOwned(userId, input.resumeVersionId)
 
   const updated = await applicationRepository.update(userId, id, input)
   if (!updated) throw new ApplicationNotFoundError()

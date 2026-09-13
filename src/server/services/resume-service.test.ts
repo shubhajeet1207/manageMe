@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { prisma } from "@/lib/db/prisma"
-import { MAX_UPLOAD_BYTES } from "@/server/storage/pdf"
+import { MAX_UPLOAD_BYTES } from "@/server/files/pdf"
 import {
   FileTooLargeError,
   InvalidPdfError,
@@ -285,6 +285,32 @@ describe("deleteResume", () => {
     await expect(deleteResume(user.id, resume.id)).rejects.toBeInstanceOf(ResumeInUseError)
 
     // Neither the row nor the object.
+    expect(await prisma.resumeVersion.count({ where: { id: version.id } })).toBe(1)
+    expect(await exists(storedPath(version.storageKey))).toBe(true)
+  })
+
+  it("answers a link created inside the TOCTOU window with the same refusal", async () => {
+    const { user, resume, version } = await makeUserWithResume()
+    const company = await makeCompany(user.id)
+    await prisma.application.create({
+      data: {
+        userId: user.id,
+        companyId: company.id,
+        roleTitle: "Engineer",
+        resumeVersionId: version.id,
+      },
+    })
+
+    // Stand in for a concurrent link: the pre-check sees none, so the delete
+    // runs and meets `onDelete: Restrict`. Only the first count is faked; the
+    // re-count inside the catch hits the database and finds the real link.
+    vi.spyOn(prisma.application, "count").mockResolvedValueOnce(0)
+
+    await expect(deleteResume(user.id, resume.id)).rejects.toMatchObject({
+      name: "ResumeInUseError",
+      count: 1,
+    })
+
     expect(await prisma.resumeVersion.count({ where: { id: version.id } })).toBe(1)
     expect(await exists(storedPath(version.storageKey))).toBe(true)
   })

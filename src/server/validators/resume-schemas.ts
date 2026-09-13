@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { MAX_UPLOAD_BYTES, PDF_CONTENT_TYPE } from "@/server/storage/pdf"
+import { MAX_UPLOAD_BYTES, PDF_CONTENT_TYPE } from "@/server/files/pdf"
 
 // `.optional()` MUST be the outermost wrapper — see the note in
 // company-schemas.ts. Applying `.transform()` after `.optional()` hides the
@@ -29,7 +29,7 @@ export type UpdateResumeInput = z.infer<typeof updateResumeSchema>
 // schema, as every other form in the app does.
 //
 // The magic-byte check is deliberately NOT here — it needs the bytes.
-// `validatePdfUpload` in src/server/storage/pdf.ts owns that; the action runs
+// `validatePdfUpload` in src/server/files/pdf.ts owns that; the action runs
 // this schema, reads the bytes, then runs the byte check and maps its failure
 // to a field error on `file` like any other.
 export const uploadResumeVersionSchema = z.object({

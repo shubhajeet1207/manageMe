@@ -3,6 +3,7 @@ import {
   createApplicationSchema,
   updateApplicationSchema,
   updateStatusSchema,
+  type CreateApplicationInput,
 } from "./application-schemas"
 
 const base = { companyId: "c1", roleTitle: "Engineer", status: "APPLIED" }
@@ -120,6 +121,31 @@ describe("createApplicationSchema", () => {
   it("normalises an empty applied date to undefined", () => {
     const result = createApplicationSchema.safeParse({ ...base, appliedAt: "" })
     expect(result.success && result.data.appliedAt).toBeUndefined()
+  })
+
+  it("keeps a resume version id", () => {
+    const result = createApplicationSchema.safeParse({ ...base, resumeVersionId: "rv1" })
+    expect(result.success && result.data.resumeVersionId).toBe("rv1")
+  })
+
+  it("normalises the None option to undefined rather than an empty string", () => {
+    // The select submits "" for None; an empty string would fail the foreign
+    // key instead of clearing the link.
+    const result = createApplicationSchema.safeParse({ ...base, resumeVersionId: "" })
+    expect(result.success && result.data.resumeVersionId).toBeUndefined()
+  })
+
+  it("accepts an application with no resume linked", () => {
+    const result = createApplicationSchema.safeParse(base)
+    expect(result.success && "resumeVersionId" in result.data).toBe(false)
+  })
+
+  it("infers resumeVersionId as an OPTIONAL key, not a required one that may be undefined", () => {
+    // The Zod-4 footgun: `.transform()` after `.optional()` hides the optional
+    // marker from key inference. This assignment does not compile if
+    // `resumeVersionId` infers as required, so `tsc` is the assertion.
+    const input: CreateApplicationInput = { companyId: "c1", roleTitle: "Engineer", status: "SAVED" }
+    expect(input.resumeVersionId).toBeUndefined()
   })
 })
 

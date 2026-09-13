@@ -177,15 +177,27 @@ export function countApplicationsForResume(userId: string, resumeId: string): Pr
   })
 }
 
-export function listApplicationsForResume(
+export async function listApplicationsForResume(
   userId: string,
   resumeId: string
 ): Promise<ApplicationWithCompanyAndVersion[]> {
-  return prisma.application.findMany({
+  const applications = await prisma.application.findMany({
     where: { userId, resumeVersion: { userId, resumeId } },
     include: { company: true, resumeVersion: true },
     orderBy: { updatedAt: "desc" },
   })
+
+  // Prisma cannot put a `where` on a to-one `include`, so the join above
+  // follows the foreign key whoever owns its target. The outer `where` makes
+  // that safe, but this is the render path for the detail page — the same
+  // belt-and-braces reasoning as `resolveStorageKey`'s final check: a `where`
+  // loosened in a future edit drops the row here rather than showing another
+  // user's file.
+  return applications.filter(
+    (application) =>
+      application.resumeVersion?.userId === userId &&
+      application.resumeVersion.resumeId === resumeId
+  )
 }
 
 /** Applications with no resume linked. §9(b): these appear in no resume's

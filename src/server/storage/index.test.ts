@@ -9,9 +9,11 @@ afterEach(() => {
 })
 
 describe("getStorage", () => {
-  it("defaults to the local driver when STORAGE_DRIVER is unset", () => {
+  it("defaults to the local driver when STORAGE_DRIVER is unset", async () => {
     delete process.env.STORAGE_DRIVER
-    expect(getStorage()).toBeDefined()
+    // The local driver is identified by its answer, not by being truthy: its
+    // objects live outside the web root and have no addressable URL.
+    expect(await getStorage().url("resumes/u/a.pdf")).toBeNull()
   })
 
   it("returns the local driver for STORAGE_DRIVER=local", async () => {

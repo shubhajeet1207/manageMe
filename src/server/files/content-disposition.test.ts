@@ -20,19 +20,25 @@ describe("contentDisposition", () => {
   })
 
   it("builds an attachment header", () => {
-    expect(contentDisposition("attachment", "resume.pdf")).toContain("attachment; ")
+    expect(contentDisposition("attachment", "resume.pdf")).toBe(
+      `attachment; filename="resume.pdf"; filename*=UTF-8''resume.pdf`
+    )
   })
 
   it("strips CR and LF so a filename cannot split the response", () => {
     const header = contentDisposition("inline", `a${CR}${LF}X-Injected: 1${CR}${LF}${CR}${LF}b.pdf`)
-    expect(header).not.toContain(CR)
-    expect(header).not.toContain(LF)
+    // The full string, not just the absence of CR/LF: an implementation that
+    // truncated at the first CR, or dropped the name for the fallback, would
+    // also contain no CR/LF and would also be wrong.
+    expect(header).toBe(
+      `inline; filename="aX-Injected1b.pdf"; filename*=UTF-8''aX-Injected%3A%201b.pdf`
+    )
   })
 
   it("strips other control characters", () => {
-    const header = contentDisposition("inline", `a${NUL}b${BEL}c.pdf`)
-    expect(header).not.toContain(NUL)
-    expect(header).not.toContain(BEL)
+    expect(contentDisposition("inline", `a${NUL}b${BEL}c.pdf`)).toBe(
+      `inline; filename="abc.pdf"; filename*=UTF-8''abc.pdf`
+    )
   })
 
   it("never emits an unescaped quote inside the ASCII parameter", () => {
@@ -42,9 +48,9 @@ describe("contentDisposition", () => {
   })
 
   it("strips path separators from a traversing filename", () => {
-    const header = contentDisposition("attachment", "../../etc/passwd")
-    expect(header).not.toContain("/")
-    expect(header).not.toContain("\\")
+    expect(contentDisposition("attachment", "../../etc/passwd")).toBe(
+      `attachment; filename="....etcpasswd"; filename*=UTF-8''....etcpasswd`
+    )
   })
 
   it("keeps a non-ASCII name in the RFC 5987 parameter and an ASCII fallback", () => {
@@ -62,9 +68,13 @@ describe("contentDisposition", () => {
     expect(contentDisposition("inline", "")).toContain('filename="resume.pdf"')
   })
 
-  it("truncates a very long filename", () => {
-    const header = contentDisposition("inline", `${"a".repeat(500)}.pdf`)
-    expect(asciiParam(header).length).toBeLessThanOrEqual(255)
+  it("truncates a very long filename to exactly the cap", () => {
+    // `toBeLessThanOrEqual(255)` also passes when the name is discarded
+    // entirely, so assert the name that should survive.
+    const capped = "a".repeat(255)
+    expect(contentDisposition("inline", `${"a".repeat(500)}.pdf`)).toBe(
+      `inline; filename="${capped}"; filename*=UTF-8''${capped}`
+    )
   })
 
   it("percent-encodes characters that are not RFC 5987 attr-chars", () => {

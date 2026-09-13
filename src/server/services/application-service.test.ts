@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto"
 import { afterEach, describe, expect, it } from "vitest"
 import { prisma } from "@/lib/db/prisma"
+import { ResumeVersionNotOwnedError } from "./resume-service"
 import {
   ApplicationNotFoundError,
   CompanyNotOwnedError,
@@ -26,11 +28,36 @@ async function makeUserWithCompany() {
   return { user, company }
 }
 
+/** A resume slot holding one version, written directly: these tests are about
+ *  the link, not about the upload path. */
+async function makeResumeVersion(userId: string) {
+  const resume = await prisma.resume.create({
+    data: { userId, name: `Backend SWE ${randomUUID().slice(0, 8)}` },
+  })
+  return prisma.resumeVersion.create({
+    data: {
+      userId,
+      resumeId: resume.id,
+      label: "October",
+      originalFilename: "resume.pdf",
+      storageKey: `resumes/${userId}/${randomUUID()}.pdf`,
+      contentType: "application/pdf",
+      sizeBytes: 1024,
+    },
+  })
+}
+
 afterEach(async () => {
-  if (createdUserIds.length > 0) {
-    await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } })
-    createdUserIds.length = 0
-  }
+  if (createdUserIds.length === 0) return
+  const ids = [...createdUserIds]
+  createdUserIds.length = 0
+  // Applications Restrict on resumeVersion, so they go before the versions they
+  // point at rather than relying on the order of a user cascade.
+  await prisma.application.deleteMany({
+    where: { OR: [{ userId: { in: ids } }, { resumeVersion: { userId: { in: ids } } }] },
+  })
+  await prisma.resumeVersion.deleteMany({ where: { userId: { in: ids } } })
+  await prisma.user.deleteMany({ where: { id: { in: ids } } })
 })
 
 describe("createApplication", () => {
@@ -190,5 +217,95 @@ describe("getApplication, listApplications and deleteApplication", () => {
     await expect(deleteApplication(other.user.id, created.id)).rejects.toBeInstanceOf(
       ApplicationNotFoundError
     )
+  })
+})
+
+// The cross-entity hole `assertResumeVersionOwned` closes, and the reason
+// repository scoping cannot: every write below targets the caller's OWN
+// application row, so each `where: { userId }` matches and the foreign key is
+// satisfied. Only the service guard stands between a user and another user's
+// file. Mirrors the CompanyNotOwnedError battery above.
+describe("resume version linking", () => {
+  it("links an application to the caller's own resume version", async () => {
+    const { user, company } = await makeUserWithCompany()
+    const version = await makeResumeVersion(user.id)
+
+    const created = await createApplication(user.id, {
+      companyId: company.id,
+      roleTitle: "Engineer",
+      status: "APPLIED",
+      resumeVersionId: version.id,
+    })
+    expect(created.resumeVersionId).toBe(version.id)
+  })
+
+  it("accepts an application with no resume linked", async () => {
+    const { user, company } = await makeUserWithCompany()
+
+    const created = await createApplication(user.id, {
+      companyId: company.id,
+      roleTitle: "Engineer",
+      status: "APPLIED",
+    })
+    expect(created.resumeVersionId).toBeNull()
+  })
+
+  it("refuses to link a new application to another user's resume version", async () => {
+    const owner = await makeUserWithCompany()
+    const ownerVersion = await makeResumeVersion(owner.user.id)
+    const other = await makeUserWithCompany()
+
+    await expect(
+      createApplication(other.user.id, {
+        companyId: other.company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        resumeVersionId: ownerVersion.id,
+      })
+    ).rejects.toBeInstanceOf(ResumeVersionNotOwnedError)
+
+    expect(await prisma.application.count({ where: { userId: other.user.id } })).toBe(0)
+  })
+
+  it("refuses to move an existing application onto another user's resume version", async () => {
+    const owner = await makeUserWithCompany()
+    const ownerVersion = await makeResumeVersion(owner.user.id)
+    const other = await makeUserWithCompany()
+    const created = await createApplication(other.user.id, {
+      companyId: other.company.id,
+      roleTitle: "Engineer",
+      status: "APPLIED",
+    })
+
+    await expect(
+      updateApplication(other.user.id, created.id, {
+        companyId: other.company.id,
+        roleTitle: "Engineer",
+        status: "APPLIED",
+        resumeVersionId: ownerVersion.id,
+      })
+    ).rejects.toBeInstanceOf(ResumeVersionNotOwnedError)
+
+    const untouched = await prisma.application.findUnique({ where: { id: created.id } })
+    expect(untouched?.resumeVersionId).toBeNull()
+  })
+
+  it("refuses a resume version id that does not exist, with the identical error", async () => {
+    const owner = await makeUserWithCompany()
+    const ownerVersion = await makeResumeVersion(owner.user.id)
+    const other = await makeUserWithCompany()
+
+    const payload = (resumeVersionId: string) => ({
+      companyId: other.company.id,
+      roleTitle: "Engineer",
+      status: "APPLIED" as const,
+      resumeVersionId,
+    })
+    const notYours = await createApplication(other.user.id, payload(ownerVersion.id)).catch((e) => e)
+    const notThere = await createApplication(other.user.id, payload("does-not-exist")).catch((e) => e)
+
+    expect(notYours.constructor).toBe(notThere.constructor)
+    // The message must not confirm that the version exists.
+    expect(notYours.message).toBe(notThere.message)
   })
 })

@@ -7,7 +7,7 @@ import type {
   ResumeWithCurrentVersion,
 } from "@/server/repositories/resume-repository"
 import { getStorage } from "@/server/storage"
-import { PDF_CONTENT_TYPE, validatePdfUpload } from "@/server/storage/pdf"
+import { PDF_CONTENT_TYPE, validatePdfUpload } from "@/server/files/pdf"
 import type { CreateResumeInput } from "@/server/validators/resume-schemas"
 import type { Resume, ResumeVersion } from "@prisma/client"
 
@@ -195,7 +195,19 @@ export async function deleteResume(userId: string, id: string): Promise<void> {
 
   const versions = await resumeRepository.listVersions(userId, id)
 
-  const deleted = await resumeRepository.remove(userId, id)
+  let deleted: boolean
+  try {
+    deleted = await resumeRepository.remove(userId, id)
+  } catch (error) {
+    // A link created in the window between the count above and this delete
+    // makes `onDelete: Restrict` fire and nothing is deleted. The re-count, not
+    // the error's shape, is the evidence: Prisma reports a restrict violation
+    // under a different code than a plain foreign-key one and has changed both
+    // between versions, and the count is the number the §7 refusal names anyway.
+    const raced = await resumeRepository.countApplicationsForResume(userId, id).catch(() => 0)
+    if (raced > 0) throw new ResumeInUseError(raced)
+    throw error
+  }
   if (!deleted) throw new ResumeNotFoundError()
 
   const storage = getStorage()

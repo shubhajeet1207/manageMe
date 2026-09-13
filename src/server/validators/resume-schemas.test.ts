@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { MAX_UPLOAD_BYTES } from "@/server/storage/pdf"
+import { MAX_UPLOAD_BYTES } from "@/server/files/pdf"
 import {
   createResumeSchema,
   setCurrentVersionSchema,
