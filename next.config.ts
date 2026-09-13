@@ -9,14 +9,9 @@ const nextConfig: NextConfig = {
   // This is not a style preference: it must stay off, in every environment
   // this config applies to, or a credential typed into the form is a
   // credential typed into the log.
-  // Next 16 logs every incoming request in dev, arguments included — so a
-  // Server Action call is printed to the terminal payload and all. For
-  // `createCredentialAction`/`updateCredentialAction` that payload IS the
-  // vault: a stored password, in plain text, in the dev server's own output.
-  // The same logging printed a user's ManageMe account password at signup.
-  // This is not a style preference: it must stay off, in every environment
-  // this config applies to, or a credential typed into the form is a
-  // credential typed into the log.
+  // The floating dev-tools badge Next renders in the corner. Off by request:
+  // it overlaps the sidebar's lower content and is not wanted while working.
+  devIndicators: false,
   logging: {
     incomingRequests: false,
   },
