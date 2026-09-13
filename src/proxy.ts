@@ -3,7 +3,13 @@ import { authConfig } from "@/lib/auth/auth.config"
 
 const { auth } = NextAuth(authConfig)
 
-const PROTECTED_PREFIXES = ["/dashboard", "/settings", "/applications", "/companies"]
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/settings",
+  "/applications",
+  "/companies",
+  "/resumes",
+]
 
 export default auth((req) => {
   const isLoggedIn = !!req.auth
@@ -24,5 +30,6 @@ export const config = {
     "/settings/:path*",
     "/applications/:path*",
     "/companies/:path*",
+    "/resumes/:path*",
   ],
 }

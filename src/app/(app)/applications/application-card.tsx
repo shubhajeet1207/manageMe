@@ -5,6 +5,7 @@ import { GripVerticalIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
 import type { Company } from "@prisma/client"
+import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import { ApplicationSheet } from "./application-sheet"
 
 // ADS leans on elevation.shadow.raised alone for a card's edge, which works
@@ -77,9 +78,11 @@ export function ApplicationCardOverlay({
 export function ApplicationCard({
   application,
   companies,
+  versions,
 }: {
   application: ApplicationWithCompany
   companies: Pick<Company, "id" | "name">[]
+  versions: ResumeVersionWithResume[]
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } =
     useDraggable({ id: application.id })
@@ -129,6 +132,7 @@ export function ApplicationCard({
     >
       <ApplicationSheet
         companies={companies}
+        versions={versions}
         application={application}
         trigger={
           <button className={cn("min-w-0 flex-1 text-left", FOCUS_RING)}>

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { CompanyNotFoundError, getCompany } from "@/server/services/company-service"
 import { listApplicationsForCompany } from "@/server/services/application-service"
+import { listVersionsForUser } from "@/server/services/resume-service"
 import { ApplicationTable } from "@/app/(app)/applications/application-table"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
@@ -25,6 +26,8 @@ export default async function CompanyDetailPage({
     if (error instanceof CompanyNotFoundError) notFound()
     throw error
   }
+
+  const versions = await listVersionsForUser(session.user.id)
 
   return (
     <div className="space-y-6">
@@ -51,7 +54,7 @@ export default async function CompanyDetailPage({
             description="Applications you add for this company will be listed here."
           />
         ) : (
-          <ApplicationTable applications={applications} />
+          <ApplicationTable applications={applications} versions={versions} />
         )}
       </div>
     </div>

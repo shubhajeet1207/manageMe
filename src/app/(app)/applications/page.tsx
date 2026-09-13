@@ -3,6 +3,7 @@ import type { ApplicationStatus } from "@prisma/client"
 import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
+import { listVersionsForUser } from "@/server/services/resume-service"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
@@ -34,9 +35,10 @@ export default async function ApplicationsPage({
   const view = parseView(params.view)
   const statusFilter = parseStatus(params.status)
 
-  const [all, companies] = await Promise.all([
+  const [all, companies, versions] = await Promise.all([
     listApplications(session.user.id),
     listCompanies(session.user.id),
+    listVersionsForUser(session.user.id),
   ])
   // Filtering is a table-view affordance (§7); the board always shows the whole
   // pipeline, or its columns would lie about what the pipeline holds.
@@ -52,7 +54,11 @@ export default async function ApplicationsPage({
           <StatusFilter status={statusFilter} view={view} />
         ) : null}
         <ViewToggle view={view} status={statusFilter} />
-        <ApplicationSheet companies={companies} trigger={<Button>Add application</Button>} />
+        <ApplicationSheet
+          companies={companies}
+          versions={versions}
+          trigger={<Button>Add application</Button>}
+        />
       </PageHeader>
 
       {all.length === 0 ? (
@@ -62,6 +68,7 @@ export default async function ApplicationsPage({
         >
           <ApplicationSheet
             companies={companies}
+            versions={versions}
             trigger={<Button>Add your first application</Button>}
           />
         </EmptyState>
@@ -74,10 +81,14 @@ export default async function ApplicationsPage({
             }
           />
         ) : (
-          <ApplicationTable applications={tableApplications} companies={companies} />
+          <ApplicationTable
+            applications={tableApplications}
+            companies={companies}
+            versions={versions}
+          />
         )
       ) : (
-        <ApplicationBoard applications={all} companies={companies} />
+        <ApplicationBoard applications={all} companies={companies} versions={versions} />
       )}
     </div>
   )

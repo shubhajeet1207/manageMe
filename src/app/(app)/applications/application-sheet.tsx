@@ -25,8 +25,10 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { CompanySelect, NEW_COMPANY } from "@/components/company-select"
+import { NO_RESUME_VERSION, ResumeVersionSelect } from "@/components/resume-version-select"
 import { STATUS_LABELS, STATUS_ORDER } from "@/components/status-badge"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import type { Company } from "@prisma/client"
 import { createApplicationAction, updateApplicationAction } from "./actions"
 import { resolveCompanyAction } from "./company-actions"
@@ -56,10 +58,12 @@ type FormValues = {
 
 export function ApplicationSheet({
   companies,
+  versions = [],
   application,
   trigger,
 }: {
   companies: Pick<Company, "id" | "name">[]
+  versions?: ResumeVersionWithResume[]
   application?: ApplicationWithCompany
   // Base UI's `render` prop requires a ReactElement, not the wider ReactNode.
   trigger: React.ReactElement
@@ -70,6 +74,8 @@ export function ApplicationSheet({
   const [companyId, setCompanyId] = useState(application?.companyId ?? "")
   const [newCompanyName, setNewCompanyName] = useState("")
   const [companyError, setCompanyError] = useState<string | null>(null)
+  const [resumeVersionId, setResumeVersionId] = useState(application?.resumeVersionId ?? "")
+  const [resumeError, setResumeError] = useState<string | null>(null)
   const isEdit = Boolean(application)
 
   const form = useForm<FormValues>({
@@ -90,6 +96,7 @@ export function ApplicationSheet({
 
   function onSubmit(values: FormValues) {
     setCompanyError(null)
+    setResumeError(null)
     startTransition(async () => {
       let resolvedCompanyId = companyId
 
@@ -107,7 +114,9 @@ export function ApplicationSheet({
         return
       }
 
-      const payload = { ...values, companyId: resolvedCompanyId }
+      // "" rather than the sentinel: the schema turns an empty string into
+      // undefined, so clearing the select saves as null instead of as "".
+      const payload = { ...values, companyId: resolvedCompanyId, resumeVersionId }
       const result = isEdit
         ? await updateApplicationAction({ ...payload, id: application!.id })
         : await createApplicationAction(payload)
@@ -122,6 +131,7 @@ export function ApplicationSheet({
         for (const [field, messages] of Object.entries(result.fieldErrors)) {
           if (!messages?.[0]) continue
           if (field === "companyId") setCompanyError(messages[0])
+          else if (field === "resumeVersionId") setResumeError(messages[0])
           else form.setError(field as keyof FormValues, { message: messages[0] })
         }
       }
@@ -187,6 +197,22 @@ export function ApplicationSheet({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Resume</Label>
+            <ResumeVersionSelect
+              versions={versions}
+              value={resumeVersionId}
+              onChangeValue={(value: string) =>
+                setResumeVersionId(value === NO_RESUME_VERSION ? "" : value)
+              }
+            />
+            {resumeError ? (
+              <p role="alert" className="text-destructive text-sm">
+                {resumeError}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-2">

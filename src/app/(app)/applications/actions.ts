@@ -7,6 +7,7 @@ import {
   updateApplicationSchema,
   updateStatusSchema,
 } from "@/server/validators/application-schemas"
+import { ResumeVersionNotOwnedError } from "@/server/services/resume-service"
 import {
   ApplicationNotFoundError,
   CompanyNotOwnedError,
@@ -39,6 +40,11 @@ export async function createApplicationAction(input: unknown): Promise<ActionRes
     if (error instanceof CompanyNotOwnedError) {
       return { success: false, fieldErrors: { companyId: [error.message] } }
     }
+    // "Resume not found", deliberately: the message must not confirm that
+    // someone else's version exists.
+    if (error instanceof ResumeVersionNotOwnedError) {
+      return { success: false, fieldErrors: { resumeVersionId: [error.message] } }
+    }
     return { success: false, formError: "Something went wrong. Please try again." }
   }
 }
@@ -60,6 +66,9 @@ export async function updateApplicationAction(input: unknown): Promise<ActionRes
   } catch (error) {
     if (error instanceof CompanyNotOwnedError) {
       return { success: false, fieldErrors: { companyId: [error.message] } }
+    }
+    if (error instanceof ResumeVersionNotOwnedError) {
+      return { success: false, fieldErrors: { resumeVersionId: [error.message] } }
     }
     if (error instanceof ApplicationNotFoundError) {
       return { success: false, formError: error.message }

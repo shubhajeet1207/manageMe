@@ -20,6 +20,7 @@ import { STATUS_ACCENT, STATUS_LABELS, STATUS_ORDER } from "@/components/status-
 import { cn } from "@/lib/utils"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
 import type { Company } from "@prisma/client"
+import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import { ApplicationCard, ApplicationCardOverlay } from "./application-card"
 import { changeStatusAction } from "./actions"
 
@@ -27,10 +28,12 @@ function Column({
   status,
   applications,
   companies,
+  versions,
 }: {
   status: ApplicationStatus
   applications: ApplicationWithCompany[]
   companies: Pick<Company, "id" | "name">[]
+  versions: ResumeVersionWithResume[]
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status })
   const isOutcome = status === "REJECTED"
@@ -73,6 +76,7 @@ function Column({
             key={application.id}
             application={application}
             companies={companies}
+            versions={versions}
           />
         ))}
       </div>
@@ -83,9 +87,11 @@ function Column({
 export function ApplicationBoard({
   applications,
   companies,
+  versions,
 }: {
   applications: ApplicationWithCompany[]
   companies: Pick<Company, "id" | "name">[]
+  versions: ResumeVersionWithResume[]
 }) {
   const router = useRouter()
   const [items, setItems] = useState(applications)
@@ -220,6 +226,7 @@ export function ApplicationBoard({
                 status={status}
                 applications={items.filter((item) => item.status === status)}
                 companies={companies}
+                versions={versions}
               />
             </Fragment>
           ))}

@@ -10,9 +10,18 @@ import {
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/status-badge"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import type { Company } from "@prisma/client"
 import { ApplicationSheet } from "./application-sheet"
 import { DeleteApplicationDialog } from "./delete-application-dialog"
+
+function formatResume(
+  app: ApplicationWithCompany,
+  versionById: Map<string, ResumeVersionWithResume>
+) {
+  const version = app.resumeVersionId ? versionById.get(app.resumeVersionId) : undefined
+  return version ? `${version.resume.name} · ${version.label}` : "—"
+}
 
 function formatSalary(app: ApplicationWithCompany) {
   if (app.salaryMin == null && app.salaryMax == null) return "—"
@@ -27,10 +36,16 @@ function formatSalary(app: ApplicationWithCompany) {
 export function ApplicationTable({
   applications,
   companies = [],
+  versions = [],
 }: {
   applications: ApplicationWithCompany[]
   companies?: Pick<Company, "id" | "name">[]
+  versions?: ResumeVersionWithResume[]
 }) {
+  // The link is to a version, so the slot's name comes from the version list
+  // the page already loads for the picker rather than a second query per row.
+  const versionById = new Map(versions.map((version) => [version.id, version]))
+
   return (
     // One scroll container, not two. <Table> wraps itself in an overflow-x:auto
     // div, so the table used to scroll *inside* the bordered frame against a
@@ -49,6 +64,12 @@ export function ApplicationTable({
             <TableHead>Role</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Location</TableHead>
+            {/* Eight columns hold at 1280 and above — measured, with a
+                worst-case resume name the cell wraps to three lines and the
+                frame still does not overflow. Below xl the strip is already
+                scrolling seven columns, and the resume is the one the row's
+                own sheet carries at every width. */}
+            <TableHead className="hidden xl:table-cell">Resume</TableHead>
             <TableHead className="xl:w-28">Applied</TableHead>
             <TableHead className="xl:w-40">Salary</TableHead>
             <TableHead className="w-36 text-right">Actions</TableHead>
@@ -69,6 +90,9 @@ export function ApplicationTable({
               <TableCell className="text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                 {app.location ?? "—"}
               </TableCell>
+              <TableCell className="text-muted-foreground hidden whitespace-normal [overflow-wrap:anywhere] xl:table-cell">
+                {formatResume(app, versionById)}
+              </TableCell>
               <TableCell className="text-muted-foreground tabular-nums">
                 {app.appliedAt ? app.appliedAt.toISOString().slice(0, 10) : "—"}
               </TableCell>
@@ -83,6 +107,7 @@ export function ApplicationTable({
               <TableCell className="text-right">
                 <ApplicationSheet
                   companies={companies}
+                  versions={versions}
                   application={app}
                   trigger={
                     <Button variant="ghost" size="sm">
