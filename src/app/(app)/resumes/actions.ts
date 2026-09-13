@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import {
+  createResumeProjectSchema,
   createResumeSchema,
   setCurrentVersionSchema,
+  setResumeSkillsSchema,
+  updateResumeProjectSchema,
   updateResumeSchema,
   uploadResumeVersionSchema,
 } from "@/server/validators/resume-schemas"
@@ -14,12 +17,18 @@ import {
   ResumeInUseError,
   ResumeNameTakenError,
   ResumeNotFoundError,
+  ResumeProjectNotFoundError,
   ResumeVersionNotFoundError,
   StorageError,
   createResume,
+  createResumeProject,
   deleteResume,
+  deleteResumeProject,
+  getResumeProject,
   setCurrentVersion,
+  setResumeSkills,
   updateResume,
+  updateResumeProject,
   uploadResumeVersion,
 } from "@/server/services/resume-service"
 import type { ActionResult } from "@/types/action-result"
@@ -153,6 +162,102 @@ export async function setCurrentVersionAction(input: unknown): Promise<ActionRes
     return { success: true }
   } catch (error) {
     if (error instanceof ResumeNotFoundError || error instanceof ResumeVersionNotFoundError) {
+      return { success: false, formError: error.message }
+    }
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+}
+
+/**
+ * The list is authoritative — what it omits is removed — so the client sends
+ * the whole set, not a delta. The schema deduplicates case-insensitively;
+ * the editor refuses a clashing tag before it gets here so the user is told
+ * rather than watching one silently vanish.
+ */
+export async function setResumeSkillsAction(input: unknown): Promise<ActionResult> {
+  const session = await auth()
+  if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
+
+  const parsed = setResumeSkillsSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+
+  const { resumeId, skills } = parsed.data
+  try {
+    await setResumeSkills(session.user.id, resumeId, skills)
+    // Both paths: the library lists a resume's first few skills beside it.
+    revalidatePath("/resumes")
+    revalidatePath(`/resumes/${resumeId}`)
+    return { success: true }
+  } catch (error) {
+    if (error instanceof ResumeNotFoundError) {
+      return { success: false, formError: error.message }
+    }
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+}
+
+export async function createResumeProjectAction(input: unknown): Promise<ActionResult> {
+  const session = await auth()
+  if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
+
+  const parsed = createResumeProjectSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+
+  try {
+    // `resumeId` is client input; the service's assertResumeOwned is what stops
+    // a project being hung off someone else's slot.
+    await createResumeProject(session.user.id, parsed.data)
+    revalidatePath(`/resumes/${parsed.data.resumeId}`)
+    return { success: true }
+  } catch (error) {
+    if (error instanceof ResumeNotFoundError) {
+      return { success: false, formError: error.message }
+    }
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+}
+
+export async function updateResumeProjectAction(input: unknown): Promise<ActionResult> {
+  const session = await auth()
+  if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
+
+  const parsed = updateResumeProjectSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, fieldErrors: parsed.error.flatten().fieldErrors }
+  }
+
+  const { id, ...data } = parsed.data
+  try {
+    // Read first, for the resumeId: the payload deliberately carries none, so
+    // there is no other way to name the page to revalidate. The read is scoped
+    // to the session's user, as the update itself is.
+    const project = await getResumeProject(session.user.id, id)
+    await updateResumeProject(session.user.id, id, data)
+    revalidatePath(`/resumes/${project.resumeId}`)
+    return { success: true }
+  } catch (error) {
+    if (error instanceof ResumeProjectNotFoundError) {
+      return { success: false, formError: error.message }
+    }
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+}
+
+export async function deleteResumeProjectAction(id: string): Promise<ActionResult> {
+  const session = await auth()
+  if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
+
+  try {
+    const project = await getResumeProject(session.user.id, id)
+    await deleteResumeProject(session.user.id, id)
+    revalidatePath(`/resumes/${project.resumeId}`)
+    return { success: true }
+  } catch (error) {
+    if (error instanceof ResumeProjectNotFoundError) {
       return { success: false, formError: error.message }
     }
     return { success: false, formError: "Something went wrong. Please try again." }

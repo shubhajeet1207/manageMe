@@ -9,7 +9,10 @@ import { DeleteResumeDialog } from "../delete-resume-dialog"
 import { formatDate } from "../format"
 import { ResumeSheet } from "../resume-sheet"
 import { UploadVersionSheet } from "../upload-version-sheet"
+import { ProjectList } from "./project-list"
+import { ProjectSheet } from "./project-sheet"
 import { ResumeUsage } from "./resume-usage"
+import { SkillsEditor } from "./skills-editor"
 import { VersionList } from "./version-list"
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
@@ -40,7 +43,7 @@ export default async function ResumeDetailPage({
     throw error
   }
 
-  const { resume, versions, applications, stats } = detail
+  const { resume, versions, projects, applications, stats } = detail
   const current = resume.currentVersion
 
   return (
@@ -119,6 +122,44 @@ export default async function ResumeDetailPage({
       <div className="space-y-3">
         <SectionHeading>Used by</SectionHeading>
         <ResumeUsage stats={stats} applications={applications} />
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeading>
+          Skills <span className="tabular-nums">({resume.skills.length})</span>
+        </SectionHeading>
+        <SkillsEditor resumeId={resume.id} skills={resume.skills} />
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <SectionHeading>
+            Projects <span className="tabular-nums">({projects.length})</span>
+          </SectionHeading>
+          {projects.length > 0 ? (
+            <ProjectSheet
+              resumeId={resume.id}
+              trigger={
+                <Button variant="outline" size="sm">
+                  Add project
+                </Button>
+              }
+            />
+          ) : null}
+        </div>
+        {projects.length === 0 ? (
+          <EmptyState
+            title="No projects listed"
+            description="Projects are the evidence behind the skills — the billing-service rebuild, the migration you actually ran. List the two or three this resume leads with and they are here the next time you tailor it."
+          >
+            <ProjectSheet
+              resumeId={resume.id}
+              trigger={<Button>Add the first project</Button>}
+            />
+          </EmptyState>
+        ) : (
+          <ProjectList resumeId={resume.id} projects={projects} />
+        )}
       </div>
     </div>
   )
