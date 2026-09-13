@@ -38,6 +38,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# uploaded files (local storage driver) - never inside public/
+/.uploads/
+
 # vercel
 .vercel
 

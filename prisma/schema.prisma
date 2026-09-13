@@ -15,8 +15,10 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  companies    Company[]
-  applications Application[]
+  companies      Company[]
+  applications   Application[]
+  resumes        Resume[]
+  resumeVersions ResumeVersion[]
 }
 
 enum ApplicationStatus {
@@ -53,26 +55,88 @@ model Company {
 }
 
 model Application {
-  id        String            @id @default(cuid())
-  userId    String
-  companyId String
-  roleTitle String
-  status    ApplicationStatus @default(SAVED)
-  jobUrl    String?
-  location  String?
-  workMode  WorkMode?
-  salaryMin Int?
-  salaryMax Int?
-  currency  String?
-  source    String?
-  appliedAt DateTime?
-  notes     String?
-  createdAt DateTime          @default(now())
-  updatedAt DateTime          @updatedAt
+  id              String            @id @default(cuid())
+  userId          String
+  companyId       String
+  roleTitle       String
+  status          ApplicationStatus @default(SAVED)
+  jobUrl          String?
+  location        String?
+  workMode        WorkMode?
+  salaryMin       Int?
+  salaryMax       Int?
+  currency        String?
+  source          String?
+  appliedAt       DateTime?
+  notes           String?
+  // Which FILE was actually sent, not which slot: a resume-level pointer
+  // would silently change meaning every time a new version was uploaded.
+  // Nullable because most historical rows will not have one.
+  resumeVersionId String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  // Restrict, matching Application.company: a cascade would silently destroy
+  // the record of what was sent, which is the kind of loss noticed a month
+  // too late. The service checks the count first and raises ResumeInUseError;
+  // this constraint is the backstop, not the messenger.
+  resumeVersion ResumeVersion? @relation(fields: [resumeVersionId], references: [id], onDelete: Restrict)
 
   @@index([userId, status])
   @@index([userId, companyId])
+  @@index([userId, resumeVersionId])
+}
+
+/// A named resume slot ("Backend SWE", "Data roles") holding an ordered
+/// history of uploaded PDF versions. The slot holds no file of its own.
+model Resume {
+  id               String   @id @default(cuid())
+  userId           String
+  name             String
+  notes            String?
+  currentVersionId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions       ResumeVersion[] @relation("ResumeVersions")
+  // Unique because one version is current for at most one resume; SetNull so
+  // the pointer can never dangle.
+  currentVersion ResumeVersion?  @relation("ResumeCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/// One uploaded file, with a label and a timestamp. Uploading always inserts;
+/// there is no "replace the file on a resume" operation anywhere, because the
+/// point of the feature is being able to open what was sent six weeks ago.
+model ResumeVersion {
+  id               String   @id @default(cuid())
+  // Denormalised from Resume on purpose (§5.1a): it is what lets the
+  // ownership rule stay mechanical — `where: { id, userId }` rather than
+  // `where: { id, resume: { userId } }`, which is a relation filter a future
+  // edit can drop without the type system noticing.
+  userId           String
+  resumeId         String
+  label            String
+  /// Display metadata only. It is NEVER part of a storage key (§8.1).
+  originalFilename String
+  /// Stored, not derived: a cloud driver may prefix differently, so the row is
+  /// the record of where the bytes are. Unique so two rows can never claim the
+  /// same object.
+  storageKey       String   @unique
+  contentType      String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resume       Resume        @relation("ResumeVersions", fields: [resumeId], references: [id], onDelete: Cascade)
+  currentOf    Resume?       @relation("ResumeCurrentVersion")
+  applications Application[]
+
+  @@index([userId, resumeId, createdAt])
+  @@index([userId])
 }
