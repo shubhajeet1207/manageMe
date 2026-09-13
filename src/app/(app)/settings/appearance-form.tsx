@@ -1,27 +1,42 @@
 "use client"
 
 import { useTheme } from "next-themes"
+import { Label } from "@/components/ui/label"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { Button } from "@/components/ui/button"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+const THEMES = [
+  { value: "light", label: "Light" },
+  { value: "dark", label: "Dark" },
+  { value: "system", label: "System" },
+]
 
 export function AppearanceForm() {
   const { theme, setTheme } = useTheme()
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline" />}>
-        Theme: {theme ?? "system"}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuItem onSelect={() => setTheme("light")}>Light</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setTheme("dark")}>Dark</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => setTheme("system")}>System</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="space-y-2">
+      <Label>Theme</Label>
+      <Select value={theme ?? "system"} onValueChange={setTheme}>
+        <SelectTrigger aria-label="Theme" className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {THEMES.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-muted-foreground text-sm">
+        System follows whatever your device is set to.
+      </p>
+    </div>
   )
 }

@@ -145,7 +145,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-ring/75;
   }
   body {
     @apply bg-background text-foreground;
@@ -159,5 +159,23 @@
   h2,
   h3 {
     @apply tracking-tight;
+  }
+}
+
+/* Outside every cascade layer, so these !important declarations outrank the
+   normal ones Tailwind utilities, tw-animate-css, Base UI and sonner emit.
+   0.01ms rather than 0s on purpose: Base UI keeps a closing sheet or dialog
+   mounted until its transitionend/animationend fires, and a zero duration
+   never fires one. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

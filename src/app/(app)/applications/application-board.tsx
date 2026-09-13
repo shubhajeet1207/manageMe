@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   closestCorners,
@@ -11,6 +12,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core"
 import { toast } from "sonner"
 import { ApplicationStatus } from "@prisma/client"
@@ -18,7 +20,7 @@ import { STATUS_ACCENT, STATUS_LABELS, STATUS_ORDER } from "@/components/status-
 import { cn } from "@/lib/utils"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
 import type { Company } from "@prisma/client"
-import { ApplicationCard } from "./application-card"
+import { ApplicationCard, ApplicationCardOverlay } from "./application-card"
 import { changeStatusAction } from "./actions"
 
 function Column({
@@ -38,8 +40,8 @@ function Column({
       ref={setNodeRef}
       aria-label={STATUS_LABELS[status]}
       className={cn(
-        "flex w-64 shrink-0 flex-col lg:w-auto lg:min-w-0 lg:shrink",
-        isOutcome && "border-border lg:ml-2 lg:border-l lg:pl-3"
+        "flex w-64 shrink-0 flex-col xl:w-auto xl:min-w-0 xl:shrink",
+        isOutcome && "border-border xl:ml-2 xl:border-l xl:pl-3"
       )}
     >
       <div
@@ -87,6 +89,7 @@ export function ApplicationBoard({
 }) {
   const router = useRouter()
   const [items, setItems] = useState(applications)
+  const [activeId, setActiveId] = useState<string | null>(null)
   // Re-sync local (optimistic-drag) state when the server-provided prop
   // changes, e.g. after router.refresh() adds/edits an application — done
   // during render (not an effect) per React's "adjusting state when a prop
@@ -103,7 +106,16 @@ export function ApplicationBoard({
     useSensor(KeyboardSensor)
   )
 
+  const activeApplication = activeId
+    ? (items.find((item) => item.id === activeId) ?? null)
+    : null
+
+  function onDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id))
+  }
+
   function onDragEnd(event: DragEndEvent) {
+    setActiveId(null)
     const { active, over } = event
     if (!over) return
 
@@ -143,13 +155,15 @@ export function ApplicationBoard({
       id="application-board"
       sensors={sensors}
       collisionDetection={closestCorners}
+      onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onDragCancel={() => setActiveId(null)}
     >
-      {/* Seven equal columns from lg up so the whole funnel is visible at once.
-          Narrower than that, seven columns would be ~50px each; the board falls
-          back to fixed-width columns on a scroller and the table view is the
-          better small-screen path. */}
-      <div className="flex gap-3 overflow-x-auto pb-3 lg:grid lg:grid-cols-7 lg:gap-2 lg:overflow-x-visible lg:pb-0">
+      {/* Seven equal columns from xl up so the whole funnel is visible at once.
+          Below 1280px seven columns are under ~130px each and card titles start
+          breaking mid-word, so the board falls back to fixed-width columns on a
+          scroller and the table view is the better small-screen path. */}
+      <div className="flex gap-3 overflow-x-auto pb-3 xl:grid xl:grid-cols-7 xl:gap-2 xl:overflow-x-visible xl:pb-0">
         {STATUS_ORDER.map((status) => (
           <Column
             key={status}
@@ -159,6 +173,11 @@ export function ApplicationBoard({
           />
         ))}
       </div>
+      <DragOverlay>
+        {activeApplication ? (
+          <ApplicationCardOverlay application={activeApplication} />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   )
 }

@@ -7,6 +7,59 @@ import type { ApplicationWithCompany } from "@/server/repositories/application-r
 import type { Company } from "@prisma/client"
 import { ApplicationSheet } from "./application-sheet"
 
+const CARD_SURFACE =
+  "bg-card border-border flex w-full items-start gap-1 rounded-md border px-2 py-1.5 text-left"
+
+const GRIP = "text-muted-foreground -mr-0.5 shrink-0 rounded-sm p-0.5"
+
+// A ring in the ring colour at full strength, offset against the card it sits
+// on: the browser's own focus outline measured 2.08:1 here, well under the 3:1
+// SC 1.4.11 asks of a focus indicator.
+const FOCUS_RING =
+  "focus-visible:ring-ring focus-visible:ring-offset-card rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
+
+function CardSummary({ application }: { application: ApplicationWithCompany }) {
+  return (
+    <>
+      <span className="block text-[13px] leading-snug font-medium break-words">
+        {application.company.name}
+      </span>
+      <span className="text-muted-foreground block text-xs leading-snug break-words">
+        {application.roleTitle}
+      </span>
+      {application.location ? (
+        <span className="text-muted-foreground mt-1 block text-[11px] leading-snug break-words">
+          {application.location}
+        </span>
+      ) : null}
+    </>
+  )
+}
+
+// Rendered inside dnd-kit's <DragOverlay>, which lifts the card out of the
+// column and onto a fixed layer above the board. Hidden from assistive tech
+// because the real card stays in the tree and dnd-kit narrates the drag through
+// its own live region.
+export function ApplicationCardOverlay({
+  application,
+}: {
+  application: ApplicationWithCompany
+}) {
+  return (
+    <div
+      aria-hidden
+      className={cn(CARD_SURFACE, "border-ring cursor-grabbing shadow-lg")}
+    >
+      <div className="min-w-0 flex-1">
+        <CardSummary application={application} />
+      </div>
+      <span className={GRIP}>
+        <GripVerticalIcon className="size-3.5" />
+      </span>
+    </div>
+  )
+}
+
 export function ApplicationCard({
   application,
   companies,
@@ -14,7 +67,7 @@ export function ApplicationCard({
   application: ApplicationWithCompany
   companies: Pick<Company, "id" | "name">[]
 }) {
-  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, isDragging } =
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, isDragging } =
     useDraggable({ id: application.id })
 
   const label = `${application.company.name} — ${application.roleTitle}`
@@ -46,32 +99,21 @@ export function ApplicationCard({
         if (!event.currentTarget.contains(event.target as Node)) return
         listeners?.onPointerDown?.(event)
       }}
-      style={{
-        transform: transform
-          ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-          : undefined,
-      }}
+      // No transform here: the dragged card is drawn by <DragOverlay> on the
+      // board instead, so what stays behind is a dimmed placeholder rather than
+      // a translucent copy sliding across its neighbours.
       className={cn(
-        "group/card bg-card border-border hover:border-foreground/20 flex w-full cursor-grab items-start gap-1 rounded-md border px-2 py-1.5 text-left transition-colors active:cursor-grabbing",
-        isDragging && "border-ring opacity-70 shadow-lg"
+        CARD_SURFACE,
+        "hover:border-foreground/20 cursor-grab transition-colors active:cursor-grabbing",
+        isDragging && "opacity-40"
       )}
     >
       <ApplicationSheet
         companies={companies}
         application={application}
         trigger={
-          <button className="min-w-0 flex-1 text-left">
-            <span className="block text-[13px] leading-snug font-medium break-words">
-              {application.company.name}
-            </span>
-            <span className="text-muted-foreground block text-xs leading-snug break-words">
-              {application.roleTitle}
-            </span>
-            {application.location ? (
-              <span className="text-muted-foreground/75 mt-1 block text-[11px] leading-snug break-words">
-                {application.location}
-              </span>
-            ) : null}
+          <button className={cn("min-w-0 flex-1 text-left", FOCUS_RING)}>
+            <CardSummary application={application} />
           </button>
         }
       />
@@ -85,7 +127,11 @@ export function ApplicationCard({
         onKeyDown={(event) => listeners?.onKeyDown?.(event)}
         {...attributes}
         aria-label={`Reorder ${label}`}
-        className="text-muted-foreground/45 hover:text-foreground group-hover/card:text-muted-foreground -mr-0.5 shrink-0 cursor-grab rounded-sm p-0.5 active:cursor-grabbing"
+        className={cn(
+          GRIP,
+          "hover:text-foreground cursor-grab active:cursor-grabbing",
+          FOCUS_RING
+        )}
       >
         <GripVerticalIcon className="size-3.5" aria-hidden />
       </button>

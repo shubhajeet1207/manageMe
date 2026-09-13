@@ -10,9 +10,15 @@ export default function Loading() {
         </div>
         <Skeleton className="h-9 w-56" />
       </div>
-      <div className="flex gap-3 lg:grid lg:grid-cols-7 lg:gap-2">
+      {/* Same scroller/grid switch as ApplicationBoard. Seven 16rem columns are
+          wider than the viewport below xl, and without the scroller they widen
+          the document itself rather than an inner strip. */}
+      <div className="flex gap-3 overflow-x-auto pb-3 xl:grid xl:grid-cols-7 xl:gap-2 xl:overflow-x-visible xl:pb-0">
         {Array.from({ length: 7 }).map((_, index) => (
-          <div key={index} className="w-64 shrink-0 space-y-2 lg:w-auto lg:shrink">
+          <div
+            key={index}
+            className="w-64 shrink-0 space-y-2 xl:w-auto xl:min-w-0 xl:shrink"
+          >
             <Skeleton className="h-0.5 w-full" />
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-48 w-full" />
