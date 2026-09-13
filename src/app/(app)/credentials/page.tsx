@@ -91,7 +91,7 @@ export default async function CredentialsPage() {
       ) : null}
 
       {credentials.length === 0 ? (
-        <EmptyState title="Nothing in the vault" description={VAULT_SCOPE}>
+        <EmptyState title="Nothing saved yet" description={VAULT_SCOPE}>
           <CredentialSheet trigger={<Button>Save your first credential</Button>} />
         </EmptyState>
       ) : (

@@ -9,14 +9,9 @@ import {
 } from "@/components/ui/table"
 import { TagChip } from "@/components/tag-chip"
 import type { Link as LinkRow } from "@prisma/client"
+import { formatDate } from "../resumes/format"
 import { DeleteLinkDialog } from "./delete-link-dialog"
 import { LinkSheet } from "./link-sheet"
-
-const ADDED = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-})
 
 /** Host only, so the column does not blow the layout out. The stored URL has
  *  already been restricted to http:/https: by the schema; `rel` is the separate
@@ -81,7 +76,7 @@ export function LinkTable({
                 )}
               </TableCell>
               <TableCell className="text-muted-foreground text-right tabular-nums">
-                {ADDED.format(link.createdAt)}
+                {formatDate(link.createdAt)}
               </TableCell>
               <TableCell className="text-right">
                 <LinkSheet

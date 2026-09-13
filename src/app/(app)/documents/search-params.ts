@@ -1,3 +1,4 @@
+import { stripControlChars } from "@/server/validators/limits"
 import { dedupeTags } from "@/server/validators/tags"
 import { MAX_DOCUMENT_TAGS, MAX_SEARCH_QUERY_LENGTH, MAX_TAG_LENGTH } from "@/server/validators/document-schemas"
 
@@ -15,8 +16,13 @@ function first(value: string | string[] | undefined): string {
   return value ?? ""
 }
 
+// A NUL byte (or any other control character) is invalid in a Postgres
+// `text` value and would 500 the page instead of simply matching nothing, so
+// it is stripped here rather than left for the query to trip over: the
+// filtered string behaves exactly like any other term or tag that doesn't
+// match a row.
 export function parseQuery(value: string | string[] | undefined): string {
-  return first(value).trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+  return stripControlChars(first(value)).trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
 }
 
 /** Normalises both shapes, drops blanks and anything longer than a tag can be,
@@ -25,7 +31,7 @@ export function parseQuery(value: string | string[] | undefined): string {
 export function parseTags(value: string | string[] | undefined): string[] {
   const raw = value === undefined ? [] : Array.isArray(value) ? value : [value]
   const cleaned = raw
-    .map((tag) => tag.trim())
+    .map((tag) => stripControlChars(tag).trim())
     .filter((tag) => tag.length > 0 && tag.length <= MAX_TAG_LENGTH)
   return dedupeTags(cleaned).slice(0, MAX_DOCUMENT_TAGS)
 }

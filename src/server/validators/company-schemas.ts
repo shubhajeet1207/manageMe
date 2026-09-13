@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 
 // `.optional()` MUST be the outermost wrapper. Applying `.transform()` after
@@ -24,3 +25,6 @@ export const updateCompanySchema = createCompanySchema.extend({
   id: z.string().min(1),
 })
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>
+
+export const companyIdSchema = z.object({ id: requiredId })
+export type CompanyIdInput = z.infer<typeof companyIdSchema>

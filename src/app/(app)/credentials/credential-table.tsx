@@ -8,16 +8,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { CredentialSummary } from "@/server/repositories/credential-repository"
+import { formatDate } from "../resumes/format"
 import { CopyUsernameButton } from "./copy-username-button"
 import { CredentialSheet } from "./credential-sheet"
 import { DeleteCredentialDialog } from "./delete-credential-dialog"
 import { RevealCredentialDialog } from "./reveal-credential-dialog"
-
-const UPDATED = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-})
 
 function hostOf(url: string): string {
   try {
@@ -63,8 +58,8 @@ export function CredentialTable({
                   {credential.label}
                   {keyConfigured && !readable ? (
                     <p className="text-destructive mt-0.5 text-xs font-normal">
-                      This password was encrypted with a different key and can&apos;t be read.
-                      Restore the previous CREDENTIALS_KEY, or delete this record.
+                      This password was encrypted with a key that isn&apos;t configured here.
+                      Restore the CREDENTIALS_KEY it was sealed under, or delete this record.
                     </p>
                   ) : null}
                 </TableCell>
@@ -93,7 +88,7 @@ export function CredentialTable({
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-right tabular-nums">
-                  {UPDATED.format(credential.secretUpdatedAt)}
+                  {formatDate(credential.secretUpdatedAt)}
                 </TableCell>
                 <TableCell className="space-x-1 text-right">
                   <RevealCredentialDialog

@@ -1,6 +1,25 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next 16 logs every incoming request in dev, arguments included — so a
+  // Server Action call is printed to the terminal payload and all. For
+  // `createCredentialAction`/`updateCredentialAction` that payload IS the
+  // vault: a stored password, in plain text, in the dev server's own output.
+  // The same logging printed a user's ManageMe account password at signup.
+  // This is not a style preference: it must stay off, in every environment
+  // this config applies to, or a credential typed into the form is a
+  // credential typed into the log.
+  // Next 16 logs every incoming request in dev, arguments included — so a
+  // Server Action call is printed to the terminal payload and all. For
+  // `createCredentialAction`/`updateCredentialAction` that payload IS the
+  // vault: a stored password, in plain text, in the dev server's own output.
+  // The same logging printed a user's ManageMe account password at signup.
+  // This is not a style preference: it must stay off, in every environment
+  // this config applies to, or a credential typed into the form is a
+  // credential typed into the log.
+  logging: {
+    incomingRequests: false,
+  },
   experimental: {
     // Next 16 enforces TWO independent body-size limits before a request
     // reaches our code, and each is a separate footgun:

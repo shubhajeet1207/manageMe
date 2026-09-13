@@ -1,5 +1,6 @@
 import { TaskStatus } from "@prisma/client"
 import type { TaskFilters } from "@/server/repositories/task-repository"
+import { stripControlChars } from "@/server/validators/limits"
 
 export const TASK_STATUS_ORDER: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE"]
 
@@ -26,8 +27,11 @@ function first(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value
 }
 
+// These filters go straight into an equality match in the repository, and a
+// NUL byte or other control character is invalid in a Postgres `text` value
+// there too: it would 500 rather than simply match nothing.
 function id(value: string | string[] | undefined): string | undefined {
-  const trimmed = first(value)?.trim()
+  const trimmed = stripControlChars(first(value) ?? "").trim()
   return trimmed ? trimmed : undefined
 }
 

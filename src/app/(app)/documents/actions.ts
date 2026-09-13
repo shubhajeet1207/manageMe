@@ -12,7 +12,11 @@ import {
   deleteDocument,
   updateDocumentMetadata,
 } from "@/server/services/document-service"
-import { createDocumentSchema, updateDocumentSchema } from "@/server/validators/document-schemas"
+import {
+  createDocumentSchema,
+  documentIdSchema,
+  updateDocumentSchema,
+} from "@/server/validators/document-schemas"
 import type { ActionResult } from "@/types/action-result"
 
 // Every action calls auth() itself. Route protection guards navigation; an
@@ -88,13 +92,22 @@ export async function updateDocumentAction(input: unknown): Promise<ActionResult
   }
 }
 
-export async function deleteDocumentAction(id: string): Promise<ActionResult> {
+export async function deleteDocumentAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
   if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
 
+  // A Server Action's argument is untrusted input, exactly like a form
+  // payload: parsed here as a plain string so a crafted filter object (e.g.
+  // `{ not: "" }`) fails to parse instead of reaching Prisma's `where`, which
+  // is what turned one delete into a `deleteMany` across the whole vault.
+  const parsed = documentIdSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+
   try {
-    await deleteDocument(session.user.id, id)
-    revalidateDocument(id)
+    await deleteDocument(session.user.id, parsed.data.id)
+    revalidateDocument(parsed.data.id)
     return { success: true }
   } catch (error) {
     if (error instanceof DocumentNotFoundError) {

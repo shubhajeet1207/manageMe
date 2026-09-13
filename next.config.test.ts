@@ -35,3 +35,12 @@ describe("Next body-size limits", () => {
     expect(limit).toBeGreaterThan(MAX_UPLOAD_BYTES)
   })
 })
+
+// Next 16 logs every incoming request in dev, arguments included: a Server
+// Action's payload is printed verbatim, which for createCredentialAction and
+// updateCredentialAction IS a stored vault password.
+describe("request logging", () => {
+  it("keeps incoming-request logging off so a Server Action's arguments are never printed", () => {
+    expect(nextConfig.logging && nextConfig.logging.incomingRequests).toBe(false)
+  })
+})

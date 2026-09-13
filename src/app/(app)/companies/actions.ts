@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import {
+  companyIdSchema,
   createCompanySchema,
   updateCompanySchema,
 } from "@/server/validators/company-schemas"
@@ -63,12 +64,20 @@ export async function updateCompanyAction(input: unknown): Promise<ActionResult>
   }
 }
 
-export async function deleteCompanyAction(id: string): Promise<ActionResult> {
+export async function deleteCompanyAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
   if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
 
+  // Parsed to a plain string: a Server Action argument is untrusted input, and
+  // a filter object here would let Prisma's `deleteMany` match more than one
+  // row.
+  const parsed = companyIdSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+
   try {
-    await deleteCompany(session.user.id, id)
+    await deleteCompany(session.user.id, parsed.data.id)
     revalidatePath("/companies")
     return { success: true }
   } catch (error) {

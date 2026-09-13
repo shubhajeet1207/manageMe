@@ -9,16 +9,11 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import type { ProjectWithOpenTasks } from "@/server/repositories/project-repository"
+import { formatDate } from "../resumes/format"
 import { tasksHref } from "../tasks/search-params"
 import { DeleteProjectDialog } from "./delete-project-dialog"
 import { ProjectSheet } from "./project-sheet"
 import { ProjectStatusBadge } from "./project-status"
-
-const UPDATED = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-})
 
 export function ProjectTable({ projects }: { projects: ProjectWithOpenTasks[] }) {
   return (
@@ -60,7 +55,7 @@ export function ProjectTable({ projects }: { projects: ProjectWithOpenTasks[] })
                 )}
               </TableCell>
               <TableCell className="text-muted-foreground text-right tabular-nums">
-                {UPDATED.format(project.updatedAt)}
+                {formatDate(project.updatedAt)}
               </TableCell>
               <TableCell className="text-right">
                 <ProjectSheet

@@ -6,6 +6,7 @@ import { CredentialsKeyUnavailableError } from "@/server/crypto/credentials-key"
 import {
   CredentialLabelTakenError,
   CredentialNotFoundError,
+  CredentialTamperedError,
   CredentialUndecryptableError,
   InvalidAccountPasswordError,
   createCredential,
@@ -145,7 +146,7 @@ export async function revealCredentialAction(input: unknown): Promise<RevealResu
     if (error instanceof CredentialNotFoundError) {
       return { success: false, formError: error.message }
     }
-    if (error instanceof CredentialUndecryptableError) {
+    if (error instanceof CredentialUndecryptableError || error instanceof CredentialTamperedError) {
       return { success: false, formError: error.message }
     }
     if (error instanceof CredentialsKeyUnavailableError) {
@@ -164,7 +165,7 @@ export async function reencryptCredentialsAction(): Promise<ActionResult> {
     revalidatePath("/credentials")
     return { success: true }
   } catch (error) {
-    if (error instanceof CredentialUndecryptableError) {
+    if (error instanceof CredentialUndecryptableError || error instanceof CredentialTamperedError) {
       return { success: false, formError: error.message }
     }
     if (error instanceof CredentialsKeyUnavailableError) {

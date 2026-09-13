@@ -33,7 +33,7 @@ export function DeleteCompanyDialog({
     event.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await deleteCompanyAction(companyId)
+      const result = await deleteCompanyAction({ id: companyId })
       if (result.success) {
         setOpen(false)
         router.refresh()

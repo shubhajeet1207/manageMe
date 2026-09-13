@@ -7,15 +7,9 @@ import type { TaskOwnerOptions } from "../tasks/task-sheet"
 import { TaskSheet } from "../tasks/task-sheet"
 import { LinkSheet } from "../links/link-sheet"
 import { ProjectSheet } from "../projects/project-sheet"
+import { formatDate } from "../resumes/format"
 import { DismissQuickDropDialog } from "./dismiss-quick-drop-dialog"
 import { TriageMenu } from "./triage-menu"
-
-const CAPTURED = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-})
 
 export function QuickDropRow({
   item,
@@ -53,7 +47,7 @@ export function QuickDropRow({
           </p>
         )}
         <p className="text-muted-foreground text-xs tabular-nums">
-          <time dateTime={item.createdAt.toISOString()}>{CAPTURED.format(item.createdAt)}</time>
+          <time dateTime={item.createdAt.toISOString()}>{formatDate(item.createdAt)}</time>
         </p>
       </div>
 

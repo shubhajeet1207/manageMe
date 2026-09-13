@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { optionalShortText } from "@/server/validators/limits"
+import { optionalShortText, requiredId } from "@/server/validators/limits"
 import { tagList } from "@/server/validators/tags"
 import { httpUrl } from "@/server/validators/url"
 
@@ -28,4 +28,4 @@ export type CreateLinkInput = z.infer<typeof createLinkSchema>
 export const updateLinkSchema = z.object({ id: z.string().min(1), ...linkFields })
 export type UpdateLinkInput = z.infer<typeof updateLinkSchema>
 
-export const linkIdSchema = z.object({ id: z.string().min(1) })
+export const linkIdSchema = z.object({ id: requiredId })

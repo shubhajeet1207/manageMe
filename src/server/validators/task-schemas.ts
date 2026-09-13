@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { TaskStatus } from "@prisma/client"
-import { optionalId, optionalLongText } from "@/server/validators/limits"
+import { optionalId, optionalLongText, requiredId } from "@/server/validators/limits"
 
 // `.optional()` MUST be the outermost wrapper on every optional field — see the
 // note in company-schemas.ts.
@@ -72,4 +72,4 @@ export const setTaskDoneSchema = z.object({
 })
 export type SetTaskDoneInput = z.infer<typeof setTaskDoneSchema>
 
-export const taskIdSchema = z.object({ id: z.string().min(1) })
+export const taskIdSchema = z.object({ id: requiredId })

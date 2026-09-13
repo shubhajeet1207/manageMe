@@ -33,7 +33,7 @@ export function DeleteProjectDialog({
     event.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await deleteResumeProjectAction(projectId)
+      const result = await deleteResumeProjectAction({ id: projectId })
       if (result.success) {
         setOpen(false)
         router.refresh()

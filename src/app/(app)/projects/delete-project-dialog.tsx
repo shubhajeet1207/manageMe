@@ -37,7 +37,7 @@ export function DeleteProjectDialog({
     event.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await deleteProjectAction(projectId)
+      const result = await deleteProjectAction({ id: projectId })
       if (result.success) {
         setOpen(false)
         toast.success("Project deleted")

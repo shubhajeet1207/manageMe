@@ -93,8 +93,9 @@ export function getPreviousCredentialsKey(): CredentialsKey | null {
 
 /**
  * Which key a stored row needs: current, else previous, else none. Returning
- * null rather than throwing lets the service raise the row-level "encrypted
- * with a different key" message instead of taking the whole page down.
+ * null rather than throwing lets the service raise `CredentialUndecryptableError`
+ * — the row's key isn't configured here — instead of taking the whole page
+ * down.
  */
 export function resolveKeyById(keyId: string): Uint8Array | null {
   const current = getCredentialsKey()

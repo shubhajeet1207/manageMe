@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { optionalShortText } from "@/server/validators/limits"
+import { optionalShortText, requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 
 // `.optional()` MUST be the outermost wrapper on every optional field — see the
@@ -58,5 +58,5 @@ export const revealCredentialSchema = z.object({
 })
 export type RevealCredentialInput = z.infer<typeof revealCredentialSchema>
 
-export const credentialIdSchema = z.object({ id: z.string().min(1) })
+export const credentialIdSchema = z.object({ id: requiredId })
 export type CredentialIdInput = z.infer<typeof credentialIdSchema>

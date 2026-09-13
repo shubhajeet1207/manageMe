@@ -5,6 +5,7 @@ import {
   downloadFallbackName,
   readDocumentFile,
 } from "@/server/services/document-service"
+import { hasControlChars } from "@/server/validators/limits"
 
 /**
  * The only route that emits document bytes (§8.6). It takes a row id, never a
@@ -35,6 +36,13 @@ export async function GET(
   if (!session?.user?.id) return notFound()
 
   const { id } = await params
+
+  // A NUL byte (or any other control character) is invalid in a Postgres
+  // `text` value: the query below would not answer "no match", it would throw
+  // and fall into the 500 below, carrying driver text no client should see.
+  // Rejected here, it takes the same not-found path as any other id that
+  // doesn't match a row.
+  if (hasControlChars(id)) return notFound()
 
   let file
   try {

@@ -36,7 +36,7 @@ export function DeleteResumeDialog({
     event.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await deleteResumeAction(resumeId)
+      const result = await deleteResumeAction({ id: resumeId })
       if (result.success) {
         setOpen(false)
         if (redirectTo) router.push(redirectTo)

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { ProjectStatus } from "@prisma/client"
-import { optionalLongText } from "@/server/validators/limits"
+import { optionalLongText, requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 
 // `.optional()` MUST be the outermost wrapper on every optional field — see the
@@ -22,4 +22,5 @@ export type CreateProjectInput = z.infer<typeof createProjectSchema>
 export const updateProjectSchema = z.object({ id: z.string().min(1), ...projectFields })
 export type UpdateProjectInput = z.infer<typeof updateProjectSchema>
 
-export const projectIdSchema = z.object({ id: z.string().min(1) })
+export const projectIdSchema = z.object({ id: requiredId })
+export type ProjectIdInput = z.infer<typeof projectIdSchema>

@@ -179,7 +179,12 @@ export async function deleteDocument(userId: string, id: string): Promise<void> 
   const document = await documentRepository.findById(userId, id)
   if (!document) throw new DocumentNotFoundError()
 
-  const deleted = await documentRepository.remove(userId, id)
+  // Deleted by the ROW's own id, not the caller's `id` argument again: reusing
+  // the argument here would run a second, independent `deleteMany` against
+  // whatever it matches, which is exactly how one delete became eight when
+  // `id` arrived unvalidated. Keying off `document.id` ties the delete to the
+  // single row this function already resolved and is about to clean up.
+  const deleted = await documentRepository.remove(userId, document.id)
   if (!deleted) throw new DocumentNotFoundError()
 
   try {

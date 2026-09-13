@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 import { tagList } from "@/server/validators/tags"
 import { MAX_UPLOAD_BYTES, PDF_CONTENT_TYPE } from "@/server/files/pdf"
@@ -25,6 +26,9 @@ export const updateResumeSchema = createResumeSchema.extend({
   id: z.string().min(1),
 })
 export type UpdateResumeInput = z.infer<typeof updateResumeSchema>
+
+export const resumeIdSchema = z.object({ id: requiredId })
+export type ResumeIdInput = z.infer<typeof resumeIdSchema>
 
 // `z.instanceof(File)` works on both sides: `File` is a global in the browser
 // and in Node >= 20, so the client resolver and the Server Action share one
@@ -96,6 +100,9 @@ export const updateResumeProjectSchema = z.object({
   ...resumeProjectFields,
 })
 export type UpdateResumeProjectInput = z.infer<typeof updateResumeProjectSchema>
+
+export const resumeProjectIdSchema = z.object({ id: requiredId })
+export type ResumeProjectIdInput = z.infer<typeof resumeProjectIdSchema>
 
 export const reorderResumeProjectsSchema = z.object({
   resumeId: z.string().min(1),

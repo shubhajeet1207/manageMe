@@ -36,7 +36,7 @@ export function DeleteDocumentDialog({
     event.preventDefault()
     setError(null)
     startTransition(async () => {
-      const result = await deleteDocumentAction(documentId)
+      const result = await deleteDocumentAction({ id: documentId })
       if (result.success) {
         setOpen(false)
         if (redirectTo) router.push(redirectTo)

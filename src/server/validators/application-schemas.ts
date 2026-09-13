@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 import { ApplicationStatus, WorkMode } from "@prisma/client"
 
@@ -101,3 +102,6 @@ export const updateStatusSchema = z.object({
   status: z.enum(ApplicationStatus),
 })
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>
+
+export const applicationIdSchema = z.object({ id: requiredId })
+export type ApplicationIdInput = z.infer<typeof applicationIdSchema>

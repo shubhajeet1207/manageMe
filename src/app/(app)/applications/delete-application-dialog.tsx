@@ -35,7 +35,7 @@ export function DeleteApplicationDialog({
   function onConfirm(event: React.MouseEvent) {
     event.preventDefault()
     startTransition(async () => {
-      const result = await deleteApplicationAction(applicationId)
+      const result = await deleteApplicationAction({ id: applicationId })
       if (result.success) {
         setOpen(false)
         router.refresh()

@@ -7,6 +7,7 @@ import * as credentialRepository from "@/server/repositories/credential-reposito
 import {
   CredentialLabelTakenError,
   CredentialNotFoundError,
+  CredentialTamperedError,
   CredentialUndecryptableError,
   InvalidAccountPasswordError,
   countCredentialsNeedingReencryption,
@@ -173,6 +174,32 @@ describe("revealCredential", () => {
     await expect(
       revealCredential(user.id, created.id, ACCOUNT_PASSWORD)
     ).rejects.toBeInstanceOf(CredentialUndecryptableError)
+  })
+
+  it("surfaces a tampered ciphertext as a DIFFERENT error than a missing key", async () => {
+    const user = await makeUser()
+    const created = await createCredential(user.id, { label: "Workday", secret: SECRET })
+
+    // The key stays exactly as it was sealed under — only the stored bytes
+    // change — so `resolveKeyById` still finds a key and `open` is the thing
+    // that fails, which is what makes this the tampering case and not the
+    // missing-key one.
+    const sealed = await credentialRepository.findSealedById(user.id, created.id)
+    const ciphertext = Uint8Array.from(sealed!.secretCiphertext)
+    ciphertext[0] ^= 0x01
+    await prisma.credential.update({
+      where: { id: created.id },
+      data: { secretCiphertext: Buffer.from(ciphertext) },
+    })
+
+    let caught: unknown
+    try {
+      await revealCredential(user.id, created.id, ACCOUNT_PASSWORD)
+    } catch (error) {
+      caught = error
+    }
+    expect(caught).toBeInstanceOf(CredentialTamperedError)
+    expect(caught).not.toBeInstanceOf(CredentialUndecryptableError)
   })
 })
 

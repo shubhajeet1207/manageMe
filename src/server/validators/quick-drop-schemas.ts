@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { LONG_TEXT_MAX } from "@/server/validators/limits"
+import { LONG_TEXT_MAX, requiredId } from "@/server/validators/limits"
 import { createLinkSchema } from "@/server/validators/link-schemas"
 import { createProjectSchema } from "@/server/validators/project-schemas"
 import { createTaskSchema } from "@/server/validators/task-schemas"
@@ -14,7 +14,7 @@ export const createQuickDropSchema = z.object({
 })
 export type CreateQuickDropInput = z.infer<typeof createQuickDropSchema>
 
-export const quickDropIdSchema = z.object({ id: z.string().min(1) })
+export const quickDropIdSchema = z.object({ id: requiredId })
 export type QuickDropIdInput = z.infer<typeof quickDropIdSchema>
 
 // Each triage carries the item id alongside the normal payload, so the service

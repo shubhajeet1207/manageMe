@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth/auth"
 import { fileResponse } from "@/server/files/file-response"
 import { PDF_CONTENT_TYPE } from "@/server/files/pdf"
 import { ResumeVersionNotFoundError, readVersionFile } from "@/server/services/resume-service"
+import { hasControlChars } from "@/server/validators/limits"
 
 /**
  * The only route that emits resume bytes (§8.4). It takes a row id, never a
@@ -32,6 +33,11 @@ export async function GET(
   if (!session?.user?.id) return notFound()
 
   const { id } = await params
+
+  // Same guard as the document vault's file route: a NUL byte or other
+  // control character is invalid in a Postgres `text` value and would 500
+  // instead of simply not matching a row.
+  if (hasControlChars(id)) return notFound()
 
   let file
   try {

@@ -40,15 +40,32 @@ export class CredentialNotFoundError extends Error {
   }
 }
 
-/** A row whose key is gone. Never silently deleted, never overwritten, and
- *  never shown as blank — a blank field reads as "there is no password here",
- *  which is the wrong thing to believe (§9.5). */
+/** A row sealed under a key this process doesn't have configured. Never
+ *  silently deleted, never overwritten, and never shown as blank — a blank
+ *  field reads as "there is no password here", which is the wrong thing to
+ *  believe (§9.5). Restoring the key genuinely fixes this case, which is why
+ *  it gets its own error rather than sharing one with `CredentialTamperedError`
+ *  below: that advice is actively wrong for a row whose ciphertext failed
+ *  authentication under a key that WAS found. */
 export class CredentialUndecryptableError extends Error {
   constructor() {
     super(
-      "This password was encrypted with a different key and can't be read. Restore the previous CREDENTIALS_KEY, or delete this record."
+      "This password was encrypted with a key that isn't configured here. Restore the CREDENTIALS_KEY (or CREDENTIALS_KEY_PREVIOUS) it was sealed under, or delete this record."
     )
     this.name = "CredentialUndecryptableError"
+  }
+}
+
+/** A row whose key WAS resolved, but whose ciphertext or auth tag failed
+ *  AES-256-GCM authentication — corruption or tampering, not a missing key.
+ *  "Restore the key" is not just unhelpful advice here, it's wrong: the key on
+ *  file is already the right one, and re-supplying it changes nothing. */
+export class CredentialTamperedError extends Error {
+  constructor() {
+    super(
+      "This password's stored data failed an integrity check and can't be read. It cannot be recovered by restoring a key — delete this record."
+    )
+    this.name = "CredentialTamperedError"
   }
 }
 
@@ -89,7 +106,7 @@ function openSealed(userId: string, row: Credential): string {
     // The row id at most. Never the ciphertext, never the nonce, never the key,
     // and never the plaintext.
     console.error("Failed to decrypt credential", row.id)
-    throw new CredentialUndecryptableError()
+    throw new CredentialTamperedError()
   }
 }
 

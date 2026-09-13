@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth/auth"
 import {
+  applicationIdSchema,
   createApplicationSchema,
   updateApplicationSchema,
   updateStatusSchema,
@@ -98,12 +99,20 @@ export async function changeStatusAction(input: unknown): Promise<ActionResult> 
   }
 }
 
-export async function deleteApplicationAction(id: string): Promise<ActionResult> {
+export async function deleteApplicationAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
   if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
 
+  // Parsed to a plain string: a Server Action argument is untrusted input, and
+  // a filter object here would let Prisma's `deleteMany` match more than one
+  // row.
+  const parsed = applicationIdSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+
   try {
-    await deleteApplication(session.user.id, id)
+    await deleteApplication(session.user.id, parsed.data.id)
     revalidateAll()
     return { success: true }
   } catch (error) {

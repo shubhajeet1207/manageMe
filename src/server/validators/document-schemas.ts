@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { DOCUMENT_CONTENT_TYPES, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB } from "@/server/files/content-types"
+import { requiredId } from "@/server/validators/limits"
 import { tagList } from "@/server/validators/tags"
 
 export const MAX_DOCUMENT_TITLE_LENGTH = 200
@@ -86,6 +87,9 @@ export const updateDocumentSchema = z.object({
   ...documentFields,
 })
 export type UpdateDocumentInput = z.infer<typeof updateDocumentSchema>
+
+export const documentIdSchema = z.object({ id: requiredId })
+export type DocumentIdInput = z.infer<typeof documentIdSchema>
 
 export const documentSearchSchema = z.object({
   query: z.string().trim().max(MAX_SEARCH_QUERY_LENGTH).optional(),

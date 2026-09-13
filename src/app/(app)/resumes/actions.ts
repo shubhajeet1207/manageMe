@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth/auth"
 import {
   createResumeProjectSchema,
   createResumeSchema,
+  resumeIdSchema,
+  resumeProjectIdSchema,
   setCurrentVersionSchema,
   setResumeSkillsSchema,
   updateResumeProjectSchema,
@@ -84,12 +86,20 @@ export async function updateResumeAction(input: unknown): Promise<ActionResult> 
   }
 }
 
-export async function deleteResumeAction(id: string): Promise<ActionResult> {
+export async function deleteResumeAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
   if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
 
+  // Parsed to a plain string: a Server Action argument is untrusted input, and
+  // a filter object here would let Prisma's `deleteMany` match more than one
+  // row.
+  const parsed = resumeIdSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+
   try {
-    await deleteResume(session.user.id, id)
+    await deleteResume(session.user.id, parsed.data.id)
     revalidatePath("/resumes")
     return { success: true }
   } catch (error) {
@@ -247,13 +257,21 @@ export async function updateResumeProjectAction(input: unknown): Promise<ActionR
   }
 }
 
-export async function deleteResumeProjectAction(id: string): Promise<ActionResult> {
+export async function deleteResumeProjectAction(input: unknown): Promise<ActionResult> {
   const session = await auth()
   if (!session?.user?.id) return { success: false, formError: "Unauthorized." }
 
+  // Parsed to a plain string: a Server Action argument is untrusted input, and
+  // a filter object here would let Prisma's `deleteMany` match more than one
+  // row.
+  const parsed = resumeProjectIdSchema.safeParse(input)
+  if (!parsed.success) {
+    return { success: false, formError: "Something went wrong. Please try again." }
+  }
+
   try {
-    const project = await getResumeProject(session.user.id, id)
-    await deleteResumeProject(session.user.id, id)
+    const project = await getResumeProject(session.user.id, parsed.data.id)
+    await deleteResumeProject(session.user.id, parsed.data.id)
     revalidatePath(`/resumes/${project.resumeId}`)
     return { success: true }
   } catch (error) {
