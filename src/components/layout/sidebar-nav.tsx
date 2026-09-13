@@ -3,29 +3,69 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import {
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { siteNav } from "@/config/site"
+import { siteNav, type NavItem } from "@/config/site"
 
-export function SidebarNav() {
+/**
+ * Ungrouped items first, then each group in first-appearance order. The nav is
+ * still read as data — one more field, not a new structure — and the sections
+ * are deliberately NOT collapsible: ten links do not need accordion state, and
+ * accordion state needs persistence to not be irritating.
+ */
+function groupNav(items: NavItem[]): { label: string | null; items: NavItem[] }[] {
+  const sections: { label: string | null; items: NavItem[] }[] = []
+
+  for (const item of items) {
+    const label = item.group ?? null
+    const existing = sections.find((section) => section.label === label)
+    if (existing) existing.items.push(item)
+    else sections.push({ label, items: [item] })
+  }
+
+  return sections
+}
+
+export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) {
   const pathname = usePathname()
+  const sections = groupNav(siteNav)
 
   return (
-    <SidebarMenu>
-      {siteNav.map((item) => (
-        <SidebarMenuItem key={item.href}>
-          <SidebarMenuButton
-            render={<Link href={item.href} />}
-            isActive={pathname.startsWith(item.href)}
-            className="data-active:bg-selected data-active:text-selected-foreground"
-          >
-            <item.icon />
-            <span>{item.title}</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+    <>
+      {sections.map((section, index) => (
+        <SidebarGroup key={section.label ?? `ungrouped-${index}`} className="p-0">
+          {section.label ? <SidebarGroupLabel>{section.label}</SidebarGroupLabel> : null}
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {section.items.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton
+                    render={<Link href={item.href} />}
+                    isActive={pathname.startsWith(item.href)}
+                    className="data-active:bg-selected data-active:text-selected-foreground"
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </SidebarMenuButton>
+                  {/* An inbox you cannot see the size of is a folder. Omitted
+                      at zero, because an empty inbox is success. */}
+                  {item.href === "/quickdrop" && quickDropCount > 0 ? (
+                    <SidebarMenuBadge className="tabular-nums">
+                      {quickDropCount}
+                    </SidebarMenuBadge>
+                  ) : null}
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       ))}
-    </SidebarMenu>
+    </>
   )
 }

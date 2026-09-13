@@ -12,6 +12,7 @@ import { StatusBadge } from "@/components/status-badge"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
 import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import type { Company } from "@prisma/client"
+import { tasksHref } from "../tasks/search-params"
 import { ApplicationSheet } from "./application-sheet"
 import { DeleteApplicationDialog } from "./delete-application-dialog"
 
@@ -37,10 +38,16 @@ export function ApplicationTable({
   applications,
   companies = [],
   versions = [],
+  openTaskCounts = new Map(),
+  taskCounts = new Map(),
 }: {
   applications: ApplicationWithCompany[]
   companies?: Pick<Company, "id" | "name">[]
   versions?: ResumeVersionWithResume[]
+  // Computed for the whole page in ONE grouped query, not per row.
+  openTaskCounts?: Map<string, number>
+  // Every task, open or finished: the delete dialog unlinks all of them.
+  taskCounts?: Map<string, number>
 }) {
   // The link is to a version, so the slot's name comes from the version list
   // the page already loads for the picker rather than a second query per row.
@@ -57,7 +64,7 @@ export function ApplicationTable({
     // simply fits; below that it keeps a wider strip and scrolls, because
     // seven columns crushed into 356px is not a table.
     <div className="border-card-border bg-card scroll-rail overflow-x-auto rounded-lg border [&_[data-slot=table-container]]:overflow-x-visible">
-      <Table className="min-w-[900px] lg:min-w-[700px]">
+      <Table className="min-w-[960px] lg:min-w-[760px]">
         <TableHeader className="bg-well/70">
           <TableRow className="hover:bg-transparent [&>th]:text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-medium [&>th]:tracking-[0.07em] [&>th]:uppercase">
             <TableHead>Company</TableHead>
@@ -72,6 +79,9 @@ export function ApplicationTable({
             <TableHead className="hidden xl:table-cell">Resume</TableHead>
             <TableHead className="xl:w-28">Applied</TableHead>
             <TableHead className="xl:w-40">Salary</TableHead>
+            {/* Narrow and right-aligned, blank at zero: a column that says "0"
+                on every row is a column that costs width and says nothing. */}
+            <TableHead className="w-16 text-right">Tasks</TableHead>
             <TableHead className="w-36 text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -104,6 +114,13 @@ export function ApplicationTable({
               <TableCell className="text-muted-foreground tabular-nums whitespace-normal">
                 {formatSalary(app)}
               </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {openTaskCounts.get(app.id) ? (
+                  <Link href={tasksHref({ applicationId: app.id })} className="hover:underline">
+                    {openTaskCounts.get(app.id)}
+                  </Link>
+                ) : null}
+              </TableCell>
               <TableCell className="text-right">
                 <ApplicationSheet
                   companies={companies}
@@ -118,6 +135,7 @@ export function ApplicationTable({
                 <DeleteApplicationDialog
                   applicationId={app.id}
                   label={`${app.roleTitle} at ${app.company.name}`}
+                  taskCount={taskCounts.get(app.id) ?? 0}
                 />
               </TableCell>
             </TableRow>

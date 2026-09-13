@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { optionalHttpUrl } from "@/server/validators/url"
 import { ApplicationStatus, WorkMode } from "@prisma/client"
 
 // `.optional()` MUST be the outermost wrapper on every field below — see the
@@ -7,28 +8,6 @@ const optionalText = z
   .string()
   .trim()
   .max(2000)
-  .transform((value) => (value === "" ? undefined : value))
-  .optional()
-
-const optionalUrl = z
-  .string()
-  .trim()
-  .url("Enter a valid URL")
-  // `url()` alone accepts any scheme, including `javascript:`/`data:`, which
-  // would otherwise flow straight into an `<a href>`. Zod runs every check on
-  // a schema even after an earlier one fails, so guard against `new URL()`
-  // throwing on a value `.url()` has already rejected.
-  .refine(
-    (value) => {
-      try {
-        return ["http:", "https:"].includes(new URL(value).protocol)
-      } catch {
-        return false
-      }
-    },
-    { message: "Enter a valid URL" }
-  )
-  .or(z.literal(""))
   .transform((value) => (value === "" ? undefined : value))
   .optional()
 
@@ -50,7 +29,7 @@ const applicationFields = z.object({
   companyId: z.string().min(1, "Company is required"),
   roleTitle: z.string().trim().min(1, "Role title is required").max(200),
   status: z.enum(ApplicationStatus).default("SAVED"),
-  jobUrl: optionalUrl,
+  jobUrl: optionalHttpUrl(),
   location: optionalText,
   workMode: z
     .enum(WorkMode)

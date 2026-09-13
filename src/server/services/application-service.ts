@@ -11,6 +11,35 @@ export class ApplicationNotFoundError extends Error {
   }
 }
 
+/** Deliberately says "Application not found": it must not confirm that an
+ *  application it refused actually exists (§12.2). */
+export class ApplicationNotOwnedError extends Error {
+  constructor() {
+    super("Application not found")
+    this.name = "ApplicationNotOwnedError"
+  }
+}
+
+/**
+ * The cross-entity guard for every write that carries a client-supplied
+ * `applicationId` — Task is the first caller.
+ *
+ * Repository scoping cannot catch this: the task being written is the caller's
+ * OWN, so it carries the caller's own `userId` and every `where: { userId }`
+ * clause on the write still matches. The foreign id in the payload is arbitrary
+ * client input, and nothing but an explicit lookup will refuse it.
+ *
+ * Called on create and on update, and skipped when the id is undefined, because
+ * unlinking is always allowed.
+ */
+export async function assertApplicationOwned(
+  userId: string,
+  applicationId: string
+): Promise<void> {
+  const application = await applicationRepository.findById(userId, applicationId)
+  if (!application) throw new ApplicationNotOwnedError()
+}
+
 // The guard and its error moved to company-service.ts when documents became
 // the second caller: two services calling one guard beats two copies drifting
 // apart. Re-exported so `applications/actions.ts` and the existing tests are

@@ -5,6 +5,10 @@ import { CompanyNotFoundError, getCompany } from "@/server/services/company-serv
 import { listApplicationsForCompany } from "@/server/services/application-service"
 import { listDocumentsForCompany } from "@/server/services/document-service"
 import { listVersionsForUser } from "@/server/services/resume-service"
+import {
+  countOpenTasksByApplication,
+  countTasksByApplication,
+} from "@/server/services/task-service"
 import { ApplicationTable } from "@/app/(app)/applications/application-table"
 import { formatDate } from "@/app/(app)/documents/format"
 import { EmptyState } from "@/components/empty-state"
@@ -39,12 +43,14 @@ export default async function CompanyDetailPage({
     throw error
   }
 
-  const [versions, documents] = await Promise.all([
+  const [versions, documents, openTaskCounts, taskCounts] = await Promise.all([
     listVersionsForUser(session.user.id),
     // The payoff for companyId being a real relation rather than a string:
     // "what do I have from Acme" is the question a vault filed by company is
     // for. Scoped by userId like every other read here.
     listDocumentsForCompany(session.user.id, id),
+    countOpenTasksByApplication(session.user.id),
+    countTasksByApplication(session.user.id),
   ])
 
   return (
@@ -72,7 +78,12 @@ export default async function CompanyDetailPage({
             description="Applications you add for this company will be listed here."
           />
         ) : (
-          <ApplicationTable applications={applications} versions={versions} />
+          <ApplicationTable
+            applications={applications}
+            versions={versions}
+            openTaskCounts={openTaskCounts}
+            taskCounts={taskCounts}
+          />
         )}
       </div>
 

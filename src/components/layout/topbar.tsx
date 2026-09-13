@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/breadcrumb"
 import { SidebarTrigger } from "@/components/ui/sidebar"
 import { siteNav } from "@/config/site"
+import { QuickDropCapture } from "./quick-drop-capture"
 import { UserMenu } from "./user-menu"
 
 export function Topbar({
@@ -33,7 +34,10 @@ export function Topbar({
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <UserMenu user={user} />
+      <div className="flex items-center gap-2">
+        <QuickDropCapture />
+        <UserMenu user={user} />
+      </div>
     </header>
   )
 }

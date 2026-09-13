@@ -4,6 +4,10 @@ import { auth } from "@/lib/auth/auth"
 import { listApplications } from "@/server/services/application-service"
 import { listCompanies } from "@/server/services/company-service"
 import { listVersionsForUser } from "@/server/services/resume-service"
+import {
+  countOpenTasksByApplication,
+  countTasksByApplication,
+} from "@/server/services/task-service"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
@@ -35,10 +39,14 @@ export default async function ApplicationsPage({
   const view = parseView(params.view)
   const statusFilter = parseStatus(params.status)
 
-  const [all, companies, versions] = await Promise.all([
+  const [all, companies, versions, openTaskCounts, taskCounts] = await Promise.all([
     listApplications(session.user.id),
     listCompanies(session.user.id),
     listVersionsForUser(session.user.id),
+    // Two grouped queries for the whole page, not a count per row: the column
+    // shows open tasks, the delete dialog names every task it will unlink.
+    countOpenTasksByApplication(session.user.id),
+    countTasksByApplication(session.user.id),
   ])
   // Filtering is a table-view affordance (§7); the board always shows the whole
   // pipeline, or its columns would lie about what the pipeline holds.
@@ -85,6 +93,8 @@ export default async function ApplicationsPage({
             applications={tableApplications}
             companies={companies}
             versions={versions}
+            openTaskCounts={openTaskCounts}
+            taskCounts={taskCounts}
           />
         )
       ) : (

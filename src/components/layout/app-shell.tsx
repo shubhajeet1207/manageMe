@@ -10,9 +10,13 @@ import { Topbar } from "./topbar"
 
 export function AppShell({
   user,
+  quickDropCount,
   children,
 }: {
   user: { name: string | null; email: string; image: string | null }
+  // One named prop rather than a generic `badges` map: that is speculative
+  // generality for one badge.
+  quickDropCount: number
   children: React.ReactNode
 }) {
   return (
@@ -23,7 +27,7 @@ export function AppShell({
           <span className="text-[15px] font-semibold tracking-tight">ManageMe</span>
         </SidebarHeader>
         <SidebarContent className="px-2">
-          <SidebarNav />
+          <SidebarNav quickDropCount={quickDropCount} />
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="min-w-0">

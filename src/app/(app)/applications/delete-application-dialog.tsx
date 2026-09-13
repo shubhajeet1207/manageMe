@@ -20,9 +20,13 @@ import { deleteApplicationAction } from "./actions"
 export function DeleteApplicationDialog({
   applicationId,
   label,
+  taskCount = 0,
 }: {
   applicationId: string
   label: string
+  /** Tasks pointing at this application are UNLINKED, never deleted (§7.4), and
+   *  the dialog names that before it happens. The board does not pass it. */
+  taskCount?: number
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -54,6 +58,9 @@ export function DeleteApplicationDialog({
           <AlertDialogTitle>Delete {label}?</AlertDialogTitle>
           <AlertDialogDescription>
             This permanently deletes the application. It cannot be undone.
+            {taskCount > 0
+              ? ` ${taskCount} task${taskCount === 1 ? "" : "s"} will be unlinked.`
+              : ""}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
