@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Not a PDF</title>
+  </head>
+  <body>
+    <h1>This is HTML, not a PDF.</h1>
+    <p>
+      The extension says .pdf and the browser will declare it as
+      application/pdf, so every check short of reading the bytes waves it
+      through. The first five bytes are "&lt;!doc", not "%PDF-", which is what
+      the server's magic-byte check actually decides on.
+    </p>
+    <script>
+      document.title = "if this ever executes, something served it as HTML"
+    </script>
+  </body>
+</html>
