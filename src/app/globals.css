@@ -95,6 +95,9 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-hovered: var(--card-hovered);
+  --color-card-border: var(--card-border);
+  --color-card-border-hovered: var(--card-border-hovered);
   /* ADS Shape: radius.xsmall 2 · small 4 · medium 6 · large 8 · xlarge 12 ·
      xxlarge 16. Jira's tight corners are a large part of why it reads as Jira,
      so the scale is the literal token set rather than a multiplier chain. */
@@ -128,6 +131,19 @@
   --accent-foreground: #292a2e; /* color.text */
   --destructive: #c9372c; /* color.background.danger.bold */
   --border: #0b120e24; /* color.border — translucent on purpose */
+  /* color.border's alpha, raised until the seam is a seam. A raised card sits
+     on the column well, and #0B120E24 over white measures 1.20:1 against
+     #F0F1F2 — no edge at all, which is how the board lost its cards. Same
+     translucent base, so the seam still darkens whatever surface is behind it
+     (well 3.38:1, sunken page 3.60:1), now past the 3:1 SC 1.4.11 asks of a
+     boundary. Hovered is one step further, 4.39:1. */
+  --card-border: #0b120e85;
+  --card-border-hovered: #0b120e99;
+  /* ADS's elevation.surface.raised.hovered is #F0F1F2 — byte-identical to
+     --well, so an ADS hover fill would dissolve a card into the column it sits
+     in. White is the far side of the well, so the light card keeps its fill and
+     carries hover in the border and the shadow instead. */
+  --card-hovered: #ffffff;
   --input: #8c8f97; /* color.border.input — 3.24:1 against a card */
   --field: #ffffff; /* color.background.input */
   --field-hovered: #f8f8f8; /* color.background.input.hovered */
@@ -197,6 +213,9 @@
   --accent-foreground: #cecfd2;
   --destructive: #f87168; /* color.background.danger.bold */
   --border: #e3e4f21f; /* color.border — translucent on purpose */
+  --card-border: #e3e4f266; /* 3.41:1 on the well, 3.65:1 on the sunken page */
+  --card-border-hovered: #e3e4f285; /* 4.92:1 on the hovered fill below */
+  --card-hovered: #2b2c2f; /* elevation.surface.overlay — lighter than the well */
   --input: #7e8188; /* color.border.input — 3.93:1 against a card */
   --field: #242528; /* color.background.input */
   --field-hovered: #2b2c2f; /* color.background.input.hovered */
@@ -279,6 +298,32 @@
   h2,
   h3 {
     @apply tracking-tight;
+  }
+}
+
+/* A horizontal scroller whose overflow has to be discoverable: macOS draws
+   overlay scrollbars that only exist while the pointer is moving, so a strip
+   that hides four of seven board columns looked like the whole board. Asking
+   for a styled scrollbar opts the element out of overlay scrollbars entirely,
+   and the rail stays on screen. */
+.scroll-rail::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.scroll-rail::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+.scroll-rail::-webkit-scrollbar-thumb {
+  background-color: var(--muted);
+  border-radius: 9999px;
+}
+/* Chromium ignores ::-webkit-scrollbar entirely once scrollbar-width or
+   scrollbar-color is set, so the standard properties are scoped to the engines
+   that have no pseudo-element to ignore. */
+@supports not selector(::-webkit-scrollbar) {
+  .scroll-rail {
+    scrollbar-width: thin;
+    scrollbar-color: var(--muted) transparent;
   }
 }
 

@@ -1,22 +1,25 @@
 import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { SignupForm } from "./signup-form"
 
 export default function SignupPage() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Create your account</CardTitle>
-        <CardDescription>
-          Already have an account?{" "}
-          <Link href="/login" className="text-primary underline-offset-2 hover:underline">
-            Log in
-          </Link>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <div className="border-card-border bg-card shadow-raised rounded-xl border p-6">
+      <h1 className="text-xl font-semibold tracking-tight">Create your account</h1>
+      <p className="text-muted-foreground mt-1.5 text-sm">
+        A tracker for the roles you are chasing, and the companies behind them.
+      </p>
+      <div className="mt-6">
         <SignupForm />
-      </CardContent>
-    </Card>
+      </div>
+      <p className="border-border text-muted-foreground mt-6 border-t pt-5 text-sm">
+        Already have an account?{" "}
+        <Link
+          href="/login"
+          className="text-primary font-medium underline-offset-2 hover:underline"
+        >
+          Log in
+        </Link>
+      </p>
+    </div>
   )
 }

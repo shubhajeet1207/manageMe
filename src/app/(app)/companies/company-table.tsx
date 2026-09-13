@@ -14,8 +14,12 @@ import { DeleteCompanyDialog } from "./delete-company-dialog"
 
 export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
   return (
-    <div className="border-border bg-card overflow-x-auto rounded-lg border">
-      <Table>
+    // Same single-scroller frame as the applications table: the inner
+    // container's overflow is neutralised so the bordered frame is the one
+    // thing that scrolls, the five columns fit every desktop width, and below
+    // lg the table holds a readable strip and scrolls instead of crushing.
+    <div className="border-card-border bg-card scroll-rail overflow-x-auto rounded-lg border [&_[data-slot=table-container]]:overflow-x-visible">
+      <Table className="min-w-[720px] lg:min-w-[560px]">
         <TableHeader className="bg-well/70">
           <TableRow className="hover:bg-transparent [&>th]:text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-medium [&>th]:tracking-[0.07em] [&>th]:uppercase">
             <TableHead>Name</TableHead>
@@ -28,12 +32,12 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
         <TableBody>
           {companies.map((company) => (
             <TableRow key={company.id} className="[&>td]:px-3 [&>td]:py-1.5">
-              <TableCell className="font-medium">
+              <TableCell className="font-medium whitespace-normal [overflow-wrap:anywhere]">
                 <Link href={`/companies/${company.id}`} className="hover:underline">
                   {company.name}
                 </Link>
               </TableCell>
-              <TableCell className="text-muted-foreground">
+              <TableCell className="text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
                 {company.website ? (
                   <a
                     href={company.website}
@@ -47,7 +51,9 @@ export function CompanyTable({ companies }: { companies: CompanyWithCount[] }) {
                   "—"
                 )}
               </TableCell>
-              <TableCell className="text-muted-foreground">{company.location ?? "—"}</TableCell>
+              <TableCell className="text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
+                {company.location ?? "—"}
+              </TableCell>
               <TableCell className="text-right tabular-nums">
                 {company._count.applications}
               </TableCell>

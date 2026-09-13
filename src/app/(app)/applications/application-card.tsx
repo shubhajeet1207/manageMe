@@ -7,11 +7,14 @@ import type { ApplicationWithCompany } from "@/server/repositories/application-r
 import type { Company } from "@prisma/client"
 import { ApplicationSheet } from "./application-sheet"
 
-// ADS draws a raised surface with elevation.shadow.raised and no border at
-// all — the shadow's perimeter layer is the edge. A border on top of it reads
-// as a doubled outline.
+// ADS leans on elevation.shadow.raised alone for a card's edge, which works
+// on Jira's white page and collapses on this board: the shadow's perimeter
+// layer measured 1.68:1 against the well in light and 1.09:1 in dark, so the
+// card had no findable boundary at all. --card-border keeps ADS's translucent
+// border base and raises its alpha until the seam clears 3:1 (globals.css has
+// the measurements), and the shadow stays as the depth cue.
 const CARD_SURFACE =
-  "bg-card shadow-raised flex w-full items-start gap-1 rounded-md px-2 py-1.5 text-left"
+  "bg-card border-card-border shadow-raised flex w-full items-start gap-1 rounded-md border px-2 py-1.5 text-left"
 
 const GRIP = "text-muted-foreground -mr-0.5 shrink-0 rounded-sm p-0.5"
 
@@ -21,17 +24,25 @@ const GRIP = "text-muted-foreground -mr-0.5 shrink-0 rounded-sm p-0.5"
 const FOCUS_RING =
   "focus-visible:ring-ring focus-visible:ring-offset-card rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-offset-1"
 
+// No break-words. A 150px column makes overflow-wrap fire on ordinary words —
+// "Manufacturing" split across two lines is not a wrap, it is damage. Left to
+// wrap normally the text still breaks at every space, and the one case that
+// genuinely cannot fit — a single word longer than the column — is clipped to
+// an ellipsis rather than shattered. The whole string stays one tab stop away
+// in the sheet, and in the grip's accessible name.
+const LINE = "block overflow-hidden leading-snug text-ellipsis"
+
 function CardSummary({ application }: { application: ApplicationWithCompany }) {
   return (
     <>
-      <span className="block text-[13px] leading-snug font-medium break-words">
+      <span className={cn(LINE, "text-[13px] font-medium")}>
         {application.company.name}
       </span>
-      <span className="text-muted-foreground block text-xs leading-snug break-words">
+      <span className={cn(LINE, "text-muted-foreground text-xs")}>
         {application.roleTitle}
       </span>
       {application.location ? (
-        <span className="text-muted-foreground mt-1 block text-[11px] leading-snug break-words">
+        <span className={cn(LINE, "text-muted-foreground mt-1 text-[11px]")}>
           {application.location}
         </span>
       ) : null}
@@ -104,10 +115,15 @@ export function ApplicationCard({
       }}
       // No transform here: the dragged card is drawn by <DragOverlay> on the
       // board instead, so what stays behind is a dimmed placeholder rather than
-      // a translucent copy sliding across its neighbours.
+      // a translucent copy sliding across its neighbours. Hover lifts the card
+      // away from the well rather than into it: the old hover:bg-accent
+      // resolved to #F0F1F2, the well's own colour, so in light mode the fill
+      // went to 1.00:1 against the column and three sides of the card vanished
+      // under the pointer. The border steps up and the shadow goes to overlay
+      // instead, which reads as raised in both themes.
       className={cn(
         CARD_SURFACE,
-        "hover:bg-accent cursor-grab transition-colors active:cursor-grabbing",
+        "hover:bg-card-hovered hover:border-card-border-hovered hover:shadow-overlay cursor-grab transition-[background-color,border-color,box-shadow] active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
     >
