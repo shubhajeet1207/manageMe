@@ -20,11 +20,16 @@ const OPEN = "open"
 export function TaskFilterBar({
   filters,
   contextLabel,
+  doneCount,
 }: {
   filters: TaskFilters
   /** Names the project or application the list is narrowed to, so a filtered
    *  list that was arrived at by a link says what it is showing. */
   contextLabel: string | null
+  /** How many DONE tasks the default view is hiding right now — completed
+   *  work should be discoverable, not just theoretically reachable behind a
+   *  filter no one has a reason to open. */
+  doneCount: number
 }) {
   const router = useRouter()
 
@@ -62,6 +67,15 @@ export function TaskFilterBar({
           {contextLabel}
           <XIcon className="size-3" aria-hidden />
           <span className="sr-only">Clear this filter</span>
+        </Link>
+      ) : null}
+
+      {doneCount > 0 && filters.status !== "DONE" ? (
+        <Link
+          href={tasksHref({ ...filters, status: "DONE" })}
+          className="border-card-border bg-well text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium hover:underline"
+        >
+          {doneCount} done
         </Link>
       ) : null}
     </div>

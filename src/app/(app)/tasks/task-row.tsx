@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useEffect, useRef, useState, useTransition } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
@@ -46,16 +46,45 @@ export function TaskRow({
   const [isPending, startTransition] = useTransition()
   const [editing, setEditing] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const done = task.status === "DONE"
+  // Overrides `task.status` the instant the box is clicked, so the check and
+  // the strike-through are not waiting on the network — the row must look
+  // completed before it is allowed to disappear, or completion reads as loss.
+  const [override, setOverride] = useState<boolean | null>(null)
+  const [settling, setSettling] = useState(false)
+  const settleTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const done = override ?? task.status === "DONE"
 
-  function onToggle(checked: boolean) {
+  useEffect(() => {
+    return () => {
+      if (settleTimeout.current) clearTimeout(settleTimeout.current)
+    }
+  }, [])
+
+  function commit(checked: boolean) {
+    if (settleTimeout.current) clearTimeout(settleTimeout.current)
+    setOverride(checked)
+    setSettling(true)
     startTransition(async () => {
       const result = await setTaskDoneAction({ id: task.id, done: checked })
-      if (result.success) {
-        router.refresh()
+      if (!result.success) {
+        setOverride(null)
+        setSettling(false)
+        toast.error(result.formError ?? "Something went wrong. Please try again.")
         return
       }
-      toast.error(result.formError ?? "Something went wrong. Please try again.")
+
+      toast.success(checked ? `“${task.title}” completed` : `“${task.title}” reopened`, {
+        duration: 6000,
+        action: { label: "Undo", onClick: () => commit(!checked) },
+      })
+
+      // The row can leave the list the moment this refreshes (the default
+      // view hides DONE tasks), so it holds still long enough for the
+      // strike-through to actually register first.
+      settleTimeout.current = setTimeout(() => {
+        setSettling(false)
+        router.refresh()
+      }, 900)
     })
   }
 
@@ -65,9 +94,9 @@ export function TaskRow({
     <li className="border-card-border bg-card flex items-start gap-3 rounded-lg border px-3 py-2.5">
       <Checkbox
         checked={done}
-        disabled={isPending}
+        disabled={isPending || settling}
         aria-label={done ? `Reopen ${task.title}` : `Complete ${task.title}`}
-        onCheckedChange={(checked) => onToggle(checked === true)}
+        onCheckedChange={(checked) => commit(checked === true)}
         className="mt-0.5"
       />
 

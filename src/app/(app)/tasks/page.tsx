@@ -5,7 +5,7 @@ import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { listApplications } from "@/server/services/application-service"
 import { listProjects } from "@/server/services/project-service"
-import { listTasks } from "@/server/services/task-service"
+import { countDoneTasks, listTasks } from "@/server/services/task-service"
 import { QuickAddTask } from "./quick-add-task"
 import { parseTaskFilters } from "./search-params"
 import { TaskFilterBar } from "./task-filters"
@@ -23,10 +23,11 @@ export default async function TasksPage({
   const filters = parseTaskFilters(await searchParams)
   const userId = session.user.id
 
-  const [tasks, projects, applications] = await Promise.all([
+  const [tasks, projects, applications, doneCount] = await Promise.all([
     listTasks(userId, filters),
     listProjects(userId),
     listApplications(userId),
+    countDoneTasks(userId, filters),
   ])
 
   const options = {
@@ -51,7 +52,7 @@ export default async function TasksPage({
         title="Tasks"
         description="Everything to do, whatever it is attached to. Sorted by due date."
       >
-        <TaskFilterBar filters={filters} contextLabel={contextLabel} />
+        <TaskFilterBar filters={filters} contextLabel={contextLabel} doneCount={doneCount} />
         <TaskSheet options={options} trigger={<Button>New task</Button>} />
       </PageHeader>
 

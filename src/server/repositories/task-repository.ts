@@ -107,6 +107,24 @@ export function countByProject(userId: string, projectId: string): Promise<numbe
   return prisma.task.count({ where: { userId, projectId } })
 }
 
+/** Scoped by the same project/application context as the current list, but
+ *  never by status: this is how many DONE tasks the default (not-DONE) view
+ *  is hiding, which is the number the filter bar surfaces so completed work
+ *  is discoverable rather than assumed gone (§7.5). */
+export function countDone(
+  userId: string,
+  filters: Pick<TaskFilters, "projectId" | "applicationId">
+): Promise<number> {
+  return prisma.task.count({
+    where: {
+      userId,
+      status: "DONE",
+      ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      ...(filters.applicationId ? { applicationId: filters.applicationId } : {}),
+    },
+  })
+}
+
 export function countByApplication(userId: string, applicationId: string): Promise<number> {
   return prisma.task.count({ where: { userId, applicationId } })
 }

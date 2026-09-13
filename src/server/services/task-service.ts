@@ -46,6 +46,15 @@ export function listTasks(userId: string, filters: TaskFilters): Promise<TaskWit
   return taskRepository.listByUser(userId, filters)
 }
 
+/** How many completed tasks the default list is hiding, in this same
+ *  project/application context — the filter bar's "N done" link. */
+export function countDoneTasks(
+  userId: string,
+  filters: Pick<TaskFilters, "projectId" | "applicationId">
+): Promise<number> {
+  return taskRepository.countDone(userId, filters)
+}
+
 export async function getTask(userId: string, id: string): Promise<TaskWithContext> {
   const task = await taskRepository.findById(userId, id)
   if (!task) throw new TaskNotFoundError()
