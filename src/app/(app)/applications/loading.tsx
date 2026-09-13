@@ -19,7 +19,7 @@ export default function Loading() {
             key={index}
             className="w-64 shrink-0 space-y-2 xl:w-auto xl:min-w-0 xl:shrink"
           >
-            <Skeleton className="h-0.5 w-full" />
+            <Skeleton className="h-[3px] w-full" />
             <Skeleton className="h-4 w-20" />
             <Skeleton className="h-48 w-full" />
           </div>

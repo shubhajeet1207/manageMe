@@ -19,6 +19,7 @@ export function SidebarNav() {
           <SidebarMenuButton
             render={<Link href={item.href} />}
             isActive={pathname.startsWith(item.href)}
+            className="data-active:bg-selected data-active:text-selected-foreground"
           >
             <item.icon />
             <span>{item.title}</span>

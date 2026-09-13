@@ -45,7 +45,7 @@ function Column({
       )}
     >
       <div
-        className={cn("h-0.5 w-full rounded-full", STATUS_ACCENT[status])}
+        className={cn("h-[3px] w-full rounded-full", STATUS_ACCENT[status])}
         aria-hidden
       />
       <header className="flex items-center justify-between gap-2 px-0.5 pt-2.5 pb-2">
@@ -57,7 +57,7 @@ function Column({
         >
           {STATUS_LABELS[status]}
         </h2>
-        <span className="text-muted-foreground shrink-0 text-[11px] tabular-nums">
+        <span className="text-subtlest shrink-0 text-[11px] tabular-nums">
           {applications.length}
         </span>
       </header>

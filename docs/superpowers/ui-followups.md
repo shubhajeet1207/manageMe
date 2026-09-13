@@ -23,9 +23,11 @@ palette pass (in flight) is a **recolour** and will not fix the structural ones.
    Needs `flex gap-3 overflow-x-auto pb-3 lg:grid …` and `lg:min-w-0`.
    `src/app/(app)/applications/loading.tsx:13,15`
 
-4. **2px of stage colour is invisible at a glance.** Fourteen pixels of hue
-   across a 1136px board does not read as a spectrum in peripheral vision.
-   Consider a left border, a tinted well per stage, or a faint card tint.
+4. ~~**2px of stage colour is invisible at a glance.**~~ Resolved by the
+   Atlassian pass: the rule is 3px and now carries
+   `color.background.accent.<hue>.bolder` rather than a pale tint, so the seven
+   hues read as a spectrum. 4.36–4.90:1 against the page in light, 6.16–8.87:1
+   in dark.
 
 5. **Settings → Appearance was skipped** by the refresh — a bare
    "Theme: dark" outline button that cycles. The only screen the treatment
@@ -52,14 +54,15 @@ palette pass (in flight) is a **recolour** and will not fix the structural ones.
     fires on every card click; dialog/dropdown/select/tooltip animations,
     skeleton pulses on five routes, and sonner's spinner are all unguarded.
 
-11. **Light ACCEPTED badge 4.13:1 and REJECTED 4.34:1** at 11px normal text
-    (needs 4.5:1). *May be resolved by the Atlassian palette — re-measure.*
+11. ~~**Light ACCEPTED badge 4.13:1 and REJECTED 4.34:1**~~ Re-measured after
+    the recolour: every lozenge clears 4.5:1 (light 4.77–5.81, dark 6.01–6.63).
+    The one exception was the dark SAVED chip — see the deviation noted below.
 
 ## Already handled
 
-12. **Offer vs Accepted were indistinguishable** (both green). The Atlassian
-    brief already assigns Offer→teal `#164555`/`#9DD9EE` and
-    Accepted→green `#164B35`/`#7EE2B8`. Verify after the recolour lands.
+12. ~~**Offer vs Accepted were indistinguishable**~~ Verified on screen after
+    the recolour: Offer is ADS teal and Accepted ADS green, in both themes and
+    in both the table lozenges and the board column rules.
 
 ---
 
@@ -76,9 +79,10 @@ Paused mid-workflow at the user's request; resuming tomorrow morning.
 (`e6f239c`); its *palette* phase was stopped before writing anything, so the tree
 is clean and nothing is half-applied.
 
-**Next step — apply the real Atlassian Design System palette.** Values were
-extracted from `@atlaskit/tokens@16.12.0` (npm) and are recorded below so they do
-not need re-deriving:
+**The Atlassian palette landed** in "Apply the Atlassian Design System palette
+and Inter to both themes". Values came from `@atlaskit/tokens@16.12.0` (npm) and
+now live in `src/app/globals.css` as the shadcn token variables, each with its
+ADS token name in a comment, so nothing downstream hard-codes a hex:
 
 | role | light | dark |
 |---|---|---|
@@ -110,9 +114,19 @@ Stage accents — background / text, Jira's lozenge pattern:
 Offer is teal and Accepted green on purpose — two greens adjacent are
 indistinguishable, which a review lens independently confirmed.
 
-Font: **Inter** via `next/font/google`. Atlassian Sans is proprietary.
+One deviation, recorded in the CSS beside the value: the dark SAVED lozenge
+pairs `#4B4D51` with `color.text.accent.gray.bolder` `#E2E3E4` (6.59:1) rather
+than `color.text.accent.gray` `#A9ABAF`, which measures 3.68:1 — short of the
+4.5:1 an 11px label needs.
 
-**Also queued:** a dashboard with real analytics. The original reason it was left
-empty ("no data exists yet") expired when Phase 2 shipped — a pipeline funnel,
-offer→accept conversion, per-company counts and recent activity are all
+The focus ring went from `ring-ring/75` to solid for the same reason: ADS's
+`color.border.focused` is tuned to be used neat, and at 75% over the new light
+surfaces it measures 2.29–2.49:1 against 3.10–3.50:1 solid.
+
+Font: **Inter** via `next/font/google`, with ADS's own `font.family.body`
+fallback stack behind it. Atlassian Sans is proprietary.
+
+**Still queued:** a dashboard with real analytics. The original reason it was
+left empty ("no data exists yet") expired when Phase 2 shipped — a pipeline
+funnel, offer→accept conversion, per-company counts and recent activity are all
 computable from existing data today.

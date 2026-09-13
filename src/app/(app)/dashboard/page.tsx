@@ -87,7 +87,7 @@ export default async function DashboardPage() {
                   )}
                 >
                   <div
-                    className={cn("h-0.5 w-full rounded-full", STATUS_ACCENT[status])}
+                    className={cn("h-[3px] w-full rounded-full", STATUS_ACCENT[status])}
                     aria-hidden
                   />
                   <p

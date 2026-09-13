@@ -20,7 +20,7 @@ export function Topbar({
   const current = siteNav.find((item) => pathname.startsWith(item.href))
 
   return (
-    <header className="border-border bg-background/85 sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b px-4 backdrop-blur">
+    <header className="border-border bg-surface/85 sticky top-0 z-20 flex h-14 items-center justify-between gap-3 border-b px-4 backdrop-blur">
       <div className="flex min-w-0 items-center gap-2">
         <SidebarTrigger />
         <Breadcrumb>

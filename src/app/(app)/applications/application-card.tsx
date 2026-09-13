@@ -7,8 +7,11 @@ import type { ApplicationWithCompany } from "@/server/repositories/application-r
 import type { Company } from "@prisma/client"
 import { ApplicationSheet } from "./application-sheet"
 
+// ADS draws a raised surface with elevation.shadow.raised and no border at
+// all — the shadow's perimeter layer is the edge. A border on top of it reads
+// as a doubled outline.
 const CARD_SURFACE =
-  "bg-card border-border flex w-full items-start gap-1 rounded-md border px-2 py-1.5 text-left"
+  "bg-card shadow-raised flex w-full items-start gap-1 rounded-md px-2 py-1.5 text-left"
 
 const GRIP = "text-muted-foreground -mr-0.5 shrink-0 rounded-sm p-0.5"
 
@@ -48,7 +51,7 @@ export function ApplicationCardOverlay({
   return (
     <div
       aria-hidden
-      className={cn(CARD_SURFACE, "border-ring cursor-grabbing shadow-lg")}
+      className={cn(CARD_SURFACE, "ring-ring shadow-overlay cursor-grabbing ring-2")}
     >
       <div className="min-w-0 flex-1">
         <CardSummary application={application} />
@@ -104,7 +107,7 @@ export function ApplicationCard({
       // a translucent copy sliding across its neighbours.
       className={cn(
         CARD_SURFACE,
-        "hover:border-foreground/20 cursor-grab transition-colors active:cursor-grabbing",
+        "hover:bg-accent cursor-grab transition-colors active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
     >

@@ -4,13 +4,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ---------------------------------------------------------------------------
+   Atlassian Design System palette.
+
+   Every colour below is a literal value from @atlaskit/tokens@16.12.0 — the
+   `atlassian-light` and `atlassian-dark` themes Atlassian ships for Jira — with
+   the ADS token name in the comment beside it. They are not eyeballed
+   approximations, so please do not "tidy" one into a neighbouring shade.
+
+   Two things that look like mistakes but are not:
+
+   * The borders are 8-digit hex (`#0B120E24`, `#E3E4F21F`). ADS `color.border`
+     is deliberately translucent, which is what lets Jira stack a sunken page,
+     a column well and a raised card and still have every seam read cleanly —
+     the border darkens whatever is behind it instead of drawing a fixed grey
+     line across three different surfaces. Flattening them to solids loses that.
+
+   * Offer is teal and Accepted is green. Two greens side by side are
+     indistinguishable at a glance, so the pipeline borrows ADS's teal accent
+     for Offer.
+
+   Contrast was measured, not assumed; the notes record the ratios.
+--------------------------------------------------------------------------- */
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+  /* Atlassian Sans is proprietary and cannot be shipped, so Inter (loaded via
+     next/font/google in app/layout.tsx) stands in front of ADS's own
+     font.family.body fallback stack. */
+  --font-sans: var(--font-inter), ui-sans-serif, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Ubuntu, "Helvetica Neue", sans-serif;
+  /* ADS font.family.code, minus the proprietary Atlassian Mono. */
+  --font-mono: ui-monospace, Menlo, "Segoe UI Mono", "Ubuntu Mono", monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -20,7 +46,13 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-surface: var(--surface);
   --color-well: var(--well);
+  --color-field: var(--field);
+  --color-field-hovered: var(--field-hovered);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
+  --color-subtlest: var(--subtlest);
   --color-stage-saved: var(--stage-saved);
   --color-stage-applied: var(--stage-applied);
   --color-stage-screening: var(--stage-screening);
@@ -28,6 +60,20 @@
   --color-stage-offer: var(--stage-offer);
   --color-stage-accepted: var(--stage-accepted);
   --color-stage-rejected: var(--stage-rejected);
+  --color-lozenge-saved: var(--lozenge-saved);
+  --color-lozenge-saved-fg: var(--lozenge-saved-fg);
+  --color-lozenge-applied: var(--lozenge-applied);
+  --color-lozenge-applied-fg: var(--lozenge-applied-fg);
+  --color-lozenge-screening: var(--lozenge-screening);
+  --color-lozenge-screening-fg: var(--lozenge-screening-fg);
+  --color-lozenge-interview: var(--lozenge-interview);
+  --color-lozenge-interview-fg: var(--lozenge-interview-fg);
+  --color-lozenge-offer: var(--lozenge-offer);
+  --color-lozenge-offer-fg: var(--lozenge-offer-fg);
+  --color-lozenge-accepted: var(--lozenge-accepted);
+  --color-lozenge-accepted-fg: var(--lozenge-accepted-fg);
+  --color-lozenge-rejected: var(--lozenge-rejected);
+  --color-lozenge-rejected-fg: var(--lozenge-rejected-fg);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -49,103 +95,177 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* ADS Shape: radius.xsmall 2 · small 4 · medium 6 · large 8 · xlarge 12 ·
+     xxlarge 16. Jira's tight corners are a large part of why it reads as Jira,
+     so the scale is the literal token set rather than a multiplier chain. */
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 1rem;
+  --radius-4xl: 1.25rem;
+  --shadow-raised: var(--elevation-raised);
+  --shadow-overlay: var(--elevation-overlay);
 }
 
 :root {
-  --background: oklch(0.9755 0.0045 258.32);
-  --foreground: oklch(0.1767 0.0114 260.64);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.1767 0.0114 260.64);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.1767 0.0114 260.64);
-  --primary: oklch(0.2501 0.0193 258.36);
-  --primary-foreground: oklch(0.9755 0.0045 258.32);
-  --secondary: oklch(0.947 0.0097 252.81);
-  --secondary-foreground: oklch(0.2501 0.0193 258.36);
-  --muted: oklch(0.947 0.0097 252.81);
-  --muted-foreground: oklch(0.5157 0.03 253.72);
-  --accent: oklch(0.907 0.0144 254.61);
-  --accent-foreground: oklch(0.2501 0.0193 258.36);
-  --destructive: oklch(0.55 0.201 24.5);
-  --border: oklch(0.907 0.0144 254.61);
-  --input: oklch(0.907 0.0144 254.61);
-  --ring: oklch(0.55 0.17 258);
-  --well: oklch(0.947 0.0097 252.81);
-  --stage-saved: oklch(0.554 0.046 257.417);
-  --stage-applied: oklch(0.546 0.212 262.881);
-  --stage-screening: oklch(0.541 0.235 293.009);
-  --stage-interview: oklch(0.72 0.168 66);
-  --stage-offer: oklch(0.596 0.145 163.225);
-  --stage-accepted: oklch(0.627 0.194 149.214);
-  --stage-rejected: oklch(0.63 0.085 14);
+  --background: #f8f8f8; /* elevation.surface.sunken */
+  --foreground: #292a2e; /* color.text */
+  --surface: #ffffff; /* elevation.surface */
+  --card: #ffffff; /* elevation.surface.raised */
+  --card-foreground: #292a2e; /* color.text */
+  --popover: #ffffff; /* elevation.surface.overlay */
+  --popover-foreground: #292a2e; /* color.text */
+  --primary: #1868db; /* color.background.brand.bold */
+  --primary-foreground: #ffffff; /* color.text.inverse */
+  --secondary: #f0f1f2; /* color.background.accent.gray.subtlest */
+  --secondary-foreground: #292a2e; /* color.text */
+  --muted: #dddee1; /* color.background.accent.gray.subtler */
+  --muted-foreground: #505258; /* color.text.subtle — 7.35:1 on the page */
+  --subtlest: #6b6e76; /* color.text.subtlest — 4.51:1 on the well */
+  --accent: #f0f1f2; /* elevation.surface.hovered */
+  --accent-foreground: #292a2e; /* color.text */
+  --destructive: #c9372c; /* color.background.danger.bold */
+  --border: #0b120e24; /* color.border — translucent on purpose */
+  --input: #8c8f97; /* color.border.input — 3.24:1 against a card */
+  --field: #ffffff; /* color.background.input */
+  --field-hovered: #f8f8f8; /* color.background.input.hovered */
+  --ring: #4688ec; /* color.border.focused — 3.10:1 at full strength */
+  --selected: #e9f2fe; /* color.background.selected */
+  --selected-foreground: #1868db; /* color.text.selected */
+  --well: #f0f1f2; /* elevation.surface.hovered, as a sunken container */
+  /* Rules and dots: color.background.accent.<hue>.bolder */
+  --stage-saved: #6b6e76;
+  --stage-applied: #1868db;
+  --stage-screening: #964ac0;
+  --stage-interview: #946f00;
+  --stage-offer: #227d9b;
+  --stage-accepted: #1f845a;
+  --stage-rejected: #c9372c;
+  /* Lozenges: color.background.accent.<hue>.subtler + color.text.accent.<hue>,
+     which is exactly how Jira draws a status lozenge. */
+  --lozenge-saved: #dddee1;
+  --lozenge-saved-fg: #505258; /* 5.81:1 */
+  --lozenge-applied: #cfe1fd;
+  --lozenge-applied-fg: #1558bc; /* 5.02:1 */
+  --lozenge-screening: #eed7fc;
+  --lozenge-screening-fg: #803fa5; /* 4.97:1 */
+  --lozenge-interview: #f5e989;
+  --lozenge-interview-fg: #7f5f01; /* 4.77:1 */
+  --lozenge-offer: #c6edfb;
+  --lozenge-offer-fg: #206a83; /* 4.90:1 */
+  --lozenge-accepted: #baf3db;
+  --lozenge-accepted-fg: #216e4e; /* 4.97:1 */
+  --lozenge-rejected: #ffd5d2;
+  --lozenge-rejected-fg: #ae2e24; /* 4.88:1 */
   --chart-1: var(--stage-applied);
   --chart-2: var(--stage-screening);
   --chart-3: var(--stage-interview);
   --chart-4: var(--stage-offer);
   --chart-5: var(--stage-rejected);
-  --radius: 0.5rem;
-  --sidebar: oklch(0.963 0.0062 255.48);
-  --sidebar-foreground: oklch(0.1767 0.0114 260.64);
-  --sidebar-primary: oklch(0.2501 0.0193 258.36);
-  --sidebar-primary-foreground: oklch(0.9755 0.0045 258.32);
-  --sidebar-accent: oklch(0.907 0.0144 254.61);
-  --sidebar-accent-foreground: oklch(0.2501 0.0193 258.36);
-  --sidebar-border: oklch(0.907 0.0144 254.61);
-  --sidebar-ring: oklch(0.55 0.17 258);
+  /* elevation.shadow.raised / .overlay, flattened from ADS's layer objects. */
+  --elevation-raised: 0 1px 1px #1e1f2140, 0 0 1px #1e1f214f;
+  --elevation-overlay: 0 8px 12px #1e1f2126, 0 0 1px #1e1f214f;
+  --radius: 0.375rem; /* radius.medium */
+  --sidebar: #ffffff; /* elevation.surface */
+  --sidebar-foreground: #292a2e;
+  --sidebar-primary: #1868db;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f0f1f2; /* elevation.surface.hovered */
+  --sidebar-accent-foreground: #292a2e;
+  --sidebar-border: #0b120e24;
+  --sidebar-ring: #4688ec;
 }
 
 .dark {
-  --background: oklch(0.1767 0.0114 260.64);
-  --foreground: oklch(0.9357 0.0092 258.34);
-  --card: oklch(0.2501 0.0193 258.36);
-  --card-foreground: oklch(0.9357 0.0092 258.34);
-  --popover: oklch(0.2501 0.0193 258.36);
-  --popover-foreground: oklch(0.9357 0.0092 258.34);
-  --primary: oklch(0.9 0.0088 258.34);
-  --primary-foreground: oklch(0.1767 0.0114 260.64);
-  --secondary: oklch(0.2823 0.0233 256.42);
-  --secondary-foreground: oklch(0.9357 0.0092 258.34);
-  --muted: oklch(0.2159 0.0158 256.82);
-  --muted-foreground: oklch(0.6724 0.0287 257.05);
-  --accent: oklch(0.2823 0.0233 256.42);
-  --accent-foreground: oklch(0.9357 0.0092 258.34);
-  --destructive: oklch(0.68 0.185 23);
-  --border: oklch(0.2826 0.021 257.28);
-  --input: oklch(0.3148 0.0243 258.36);
-  --ring: oklch(0.62 0.15 258);
-  --well: oklch(0.2159 0.0158 256.82);
-  --stage-saved: oklch(0.704 0.04 256.788);
-  --stage-applied: oklch(0.707 0.165 254.624);
-  --stage-screening: oklch(0.702 0.183 293.541);
-  --stage-interview: oklch(0.828 0.189 84.429);
-  --stage-offer: oklch(0.765 0.177 163.223);
-  --stage-accepted: oklch(0.792 0.209 151.711);
-  --stage-rejected: oklch(0.58 0.082 14);
+  --background: #18191a; /* elevation.surface.sunken */
+  --foreground: #cecfd2; /* color.text */
+  --surface: #1f1f21; /* elevation.surface */
+  --card: #242528; /* elevation.surface.raised */
+  --card-foreground: #cecfd2;
+  --popover: #2b2c2f; /* elevation.surface.overlay */
+  --popover-foreground: #cecfd2;
+  --primary: #669df1; /* color.background.brand.bold */
+  --primary-foreground: #1f1f21; /* color.text.inverse */
+  --secondary: #303134; /* color.background.accent.gray.subtlest */
+  --secondary-foreground: #cecfd2;
+  --muted: #303134;
+  --muted-foreground: #a9abaf; /* color.text.subtle — 6.66:1 on a card */
+  --subtlest: #96999e; /* color.text.subtlest — 5.36:1 on a card */
+  --accent: #303134; /* elevation.surface.overlay.hovered */
+  --accent-foreground: #cecfd2;
+  --destructive: #f87168; /* color.background.danger.bold */
+  --border: #e3e4f21f; /* color.border — translucent on purpose */
+  --input: #7e8188; /* color.border.input — 3.93:1 against a card */
+  --field: #242528; /* color.background.input */
+  --field-hovered: #2b2c2f; /* color.background.input.hovered */
+  --ring: #8fb8f6; /* color.border.focused — 7.56:1 at full strength */
+  --selected: #1c2b42; /* color.background.selected */
+  --selected-foreground: #669df1; /* color.text.selected */
+  --well: #1f1f21;
+  --stage-saved: #96999e;
+  --stage-applied: #669df1;
+  --stage-screening: #c97cf4;
+  --stage-interview: #ddb30e;
+  --stage-offer: #6cc3e0;
+  --stage-accepted: #4bce97;
+  --stage-rejected: #f87168;
+  --lozenge-saved: #4b4d51;
+  /* The one deliberate departure from the extracted table. ADS pairs the dark
+     grey lozenge with color.text.accent.gray (#A9ABAF), which measures 3.68:1
+     here — short of the 4.5:1 an 11px label needs. This is its sibling one step
+     up the same published ramp, color.text.accent.gray.bolder, at 6.59:1. Every
+     other lozenge uses the unmodified pair. */
+  --lozenge-saved-fg: #e2e3e4;
+  --lozenge-applied: #123263;
+  --lozenge-applied-fg: #8fb8f6; /* 6.23:1 */
+  --lozenge-screening: #48245d;
+  --lozenge-screening-fg: #d8a0f7; /* 6.10:1 */
+  --lozenge-interview: #533f04;
+  --lozenge-interview-fg: #eed12b; /* 6.63:1 */
+  --lozenge-offer: #164555;
+  --lozenge-offer-fg: #9dd9ee; /* 6.74:1 */
+  --lozenge-accepted: #164b35;
+  --lozenge-accepted-fg: #7ee2b8; /* 6.43:1 */
+  --lozenge-rejected: #5d1f1a;
+  --lozenge-rejected-fg: #fd9891; /* 6.01:1 */
   --chart-1: var(--stage-applied);
   --chart-2: var(--stage-screening);
   --chart-3: var(--stage-interview);
   --chart-4: var(--stage-offer);
   --chart-5: var(--stage-rejected);
-  --sidebar: oklch(0.1959 0.0134 258.5);
-  --sidebar-foreground: oklch(0.9357 0.0092 258.34);
-  --sidebar-primary: oklch(0.9357 0.0092 258.34);
-  --sidebar-primary-foreground: oklch(0.1767 0.0114 260.64);
-  --sidebar-accent: oklch(0.2823 0.0233 256.42);
-  --sidebar-accent-foreground: oklch(0.9357 0.0092 258.34);
-  --sidebar-border: oklch(0.2826 0.021 257.28);
-  --sidebar-ring: oklch(0.62 0.15 258);
+  --elevation-raised: 0 1px 1px #0104043b, 0 0 1px #0104043b;
+  --elevation-overlay: 0 0 0 1px #bdbdbd1f, 0 8px 12px #0104042a,
+    0 0 1px 1px #0104043b;
+  --sidebar: #1f1f21;
+  --sidebar-foreground: #cecfd2;
+  --sidebar-primary: #669df1;
+  --sidebar-primary-foreground: #1f1f21;
+  --sidebar-accent: #303134;
+  --sidebar-accent-foreground: #cecfd2;
+  --sidebar-border: #e3e4f21f;
+  --sidebar-ring: #8fb8f6;
 }
 
 @layer base {
+  /* Tells the browser which way to render the controls it draws itself — the
+     date field's calendar glyph and spinners, and the scrollbars. Without it
+     they stay light-mode and the date picker in the application sheet is a
+     near-black icon on a near-black field. */
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
   * {
-    @apply border-border outline-ring/75;
+    /* Solid, not `outline-ring/75`. The ring was translucent because the old
+       indigo ring was too dark at full strength; ADS's color.border.focused is
+       tuned to be used neat, and at 75% over the new light surfaces it measures
+       2.29–2.49:1 — under the 3:1 SC 1.4.11 wants. Neat it is 3.10–3.50:1
+       light and 7.56:1 dark. */
+    @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;

@@ -71,7 +71,7 @@ export function DeleteCompanyDialog({
         ) : null}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} disabled={isPending}>
+          <AlertDialogAction variant="destructive" onClick={onConfirm} disabled={isPending}>
             {isPending ? "Deleting…" : "Delete"}
           </AlertDialogAction>
         </AlertDialogFooter>

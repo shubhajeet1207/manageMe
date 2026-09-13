@@ -9,7 +9,7 @@ export default function LoginPage() {
         <CardTitle>Log in</CardTitle>
         <CardDescription>
           Don&apos;t have an account?{" "}
-          <Link href="/signup" className="underline">
+          <Link href="/signup" className="text-primary underline-offset-2 hover:underline">
             Sign up
           </Link>
         </CardDescription>
