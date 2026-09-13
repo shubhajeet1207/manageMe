@@ -1,6 +1,6 @@
 import * as applicationRepository from "@/server/repositories/application-repository"
-import * as companyRepository from "@/server/repositories/company-repository"
 import type { ApplicationWithCompany } from "@/server/repositories/application-repository"
+import { assertCompanyOwned } from "@/server/services/company-service"
 import { assertResumeVersionOwned } from "@/server/services/resume-service"
 import type { CreateApplicationInput } from "@/server/validators/application-schemas"
 import type { Application, ApplicationStatus } from "@prisma/client"
@@ -11,21 +11,11 @@ export class ApplicationNotFoundError extends Error {
   }
 }
 
-export class CompanyNotOwnedError extends Error {
-  constructor() {
-    super("Company not found")
-  }
-}
-
-// Repository ownership scoping alone can't catch this: a write to the
-// caller's own application row can still carry someone else's companyId,
-// since every `where: { userId }` clause on the application still matches.
-// This check must run before create/update writes to stop a cross-tenant
-// foreign-key reference from being created.
-async function assertCompanyOwned(userId: string, companyId: string): Promise<void> {
-  const company = await companyRepository.findById(userId, companyId)
-  if (!company) throw new CompanyNotOwnedError()
-}
+// The guard and its error moved to company-service.ts when documents became
+// the second caller: two services calling one guard beats two copies drifting
+// apart. Re-exported so `applications/actions.ts` and the existing tests are
+// untouched.
+export { CompanyNotOwnedError } from "@/server/services/company-service"
 
 // The same hole one entity over: a resumeVersionId in the payload is an
 // arbitrary client-supplied id, and linking someone else's file would have the

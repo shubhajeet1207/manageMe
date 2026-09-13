@@ -99,3 +99,15 @@ describe("validatePdfUpload", () => {
     expect(MAX_UPLOAD_BYTES).toBe(10 * 1024 * 1024)
   })
 })
+
+describe("the resume path stays PDF-only", () => {
+  it("rejects a PNG, even though the document vault accepts one", () => {
+    // The proof that generalising pdf.ts onto the registry did not widen this
+    // path: `RESUME_CONTENT_TYPES` is PDF and stays PDF.
+    const bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
+    expect(validatePdfUpload(bytes, "image/png", bytes.byteLength)).toEqual({
+      ok: false,
+      reason: "wrong-type",
+    })
+  })
+})

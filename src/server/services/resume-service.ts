@@ -8,6 +8,7 @@ import type {
   ResumeWithCurrentVersion,
 } from "@/server/repositories/resume-repository"
 import { getStorage } from "@/server/storage"
+import { FileTooLargeError, StorageError } from "@/server/files/file-errors"
 import { PDF_CONTENT_TYPE, validatePdfUpload } from "@/server/files/pdf"
 import type {
   CreateResumeInput,
@@ -71,22 +72,12 @@ export class InvalidPdfError extends Error {
   }
 }
 
-export class FileTooLargeError extends Error {
-  constructor() {
-    super("This file is larger than 10MB.")
-    this.name = "FileTooLargeError"
-  }
-}
-
-/** A storage failure the user can do nothing about. Its message is generic on
- *  purpose: a Node `ENOENT` or `EACCES` carries an absolute path, and no
- *  filesystem path ever reaches the client (§12.2). */
-export class StorageError extends Error {
-  constructor() {
-    super("Something went wrong. Please try again.")
-    this.name = "StorageError"
-  }
-}
+// Both moved to server/files/file-errors.ts when the document vault became
+// their second caller: importing them FROM this service INTO the document
+// service would be a dependency pointing the wrong way. Re-exported so every
+// existing import site is unchanged. FileTooLargeError's message now derives
+// its size from MAX_UPLOAD_BYTES rather than hardcoding "10MB".
+export { FileTooLargeError, StorageError } from "@/server/files/file-errors"
 
 export type ResumeLibraryItem = ResumeWithCurrentVersion & { stats: ResumeStats }
 

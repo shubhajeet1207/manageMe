@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { MAX_RESUME_SKILLS, MAX_SKILL_LENGTH } from "@/server/validators/resume-schemas"
 import { setResumeSkillsAction } from "../actions"
-import { skillChipClassName } from "../skill-chip"
+import { tagChipClassName } from "@/components/tag-chip"
 
 export function SkillsEditor({ resumeId, skills }: { resumeId: string; skills: string[] }) {
   const router = useRouter()
@@ -135,7 +135,7 @@ export function SkillsEditor({ resumeId, skills }: { resumeId: string; skills: s
       ) : (
         <ul className="flex flex-wrap gap-1.5" aria-busy={isPending}>
           {current.map((skill) => (
-            <li key={skill} className={skillChipClassName}>
+            <li key={skill} className={tagChipClassName}>
               {skill}
               <button
                 type="button"

@@ -11,7 +11,6 @@
  */
 
 const MAX_FILENAME_LENGTH = 255
-const FALLBACK = "resume.pdf"
 
 /** RFC 5987 `attr-char` is a narrow set; `encodeURIComponent` leaves
  *  `!'()*-._~` alone, and of those `'`, `(`, `)` and `*` are not attr-chars. */
@@ -44,14 +43,20 @@ function sanitise(filename: string): string {
  * Build a `Content-Disposition` header value. `inline` previews, `attachment`
  * saves. The ASCII parameter is reduced to characters that cannot break the
  * quoted string; the RFC 5987 parameter carries the real name.
+ *
+ * `fallback` is the caller's, not this module's: the resume route wants
+ * `resume.pdf` and the document route wants the registry's extension on a
+ * generic stem. A module that builds headers has no business knowing which
+ * feature asked.
  */
 export function contentDisposition(
   disposition: "inline" | "attachment",
-  filename: string
+  filename: string,
+  fallback: string = "download"
 ): string {
   const clean = sanitise(filename)
-  const ascii = clean.replace(/[^A-Za-z0-9._-]/g, "") || FALLBACK
-  const extended = encodeRfc5987(clean || FALLBACK)
+  const ascii = clean.replace(/[^A-Za-z0-9._-]/g, "") || fallback
+  const extended = encodeRfc5987(clean || fallback)
 
   return `${disposition}; filename="${ascii}"; filename*=UTF-8''${extended}`
 }

@@ -1,11 +1,23 @@
+import Link from "next/link"
 import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { CompanyNotFoundError, getCompany } from "@/server/services/company-service"
 import { listApplicationsForCompany } from "@/server/services/application-service"
+import { listDocumentsForCompany } from "@/server/services/document-service"
 import { listVersionsForUser } from "@/server/services/resume-service"
 import { ApplicationTable } from "@/app/(app)/applications/application-table"
+import { formatDate } from "@/app/(app)/documents/format"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
+import { TagChip } from "@/components/tag-chip"
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+      {children}
+    </h2>
+  )
+}
 
 export default async function CompanyDetailPage({
   params,
@@ -27,7 +39,13 @@ export default async function CompanyDetailPage({
     throw error
   }
 
-  const versions = await listVersionsForUser(session.user.id)
+  const [versions, documents] = await Promise.all([
+    listVersionsForUser(session.user.id),
+    // The payoff for companyId being a real relation rather than a string:
+    // "what do I have from Acme" is the question a vault filed by company is
+    // for. Scoped by userId like every other read here.
+    listDocumentsForCompany(session.user.id, id),
+  ])
 
   return (
     <div className="space-y-6">
@@ -45,9 +63,9 @@ export default async function CompanyDetailPage({
       ) : null}
 
       <div className="space-y-3">
-        <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+        <SectionHeading>
           Applications <span className="tabular-nums">({applications.length})</span>
-        </h2>
+        </SectionHeading>
         {applications.length === 0 ? (
           <EmptyState
             title="No applications here yet"
@@ -55,6 +73,42 @@ export default async function CompanyDetailPage({
           />
         ) : (
           <ApplicationTable applications={applications} versions={versions} />
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <SectionHeading>
+          Documents <span className="tabular-nums">({documents.length})</span>
+        </SectionHeading>
+        {documents.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            Nothing filed against this company yet. Tag a document with it when you
+            upload one.
+          </p>
+        ) : (
+          <ul className="border-card-border bg-card divide-card-border divide-y rounded-lg border">
+            {documents.map((document) => (
+              <li
+                key={document.id}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-2.5"
+              >
+                <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <Link
+                    href={`/documents/${document.id}`}
+                    className="focus-visible:ring-ring rounded-sm text-sm font-medium outline-none [overflow-wrap:anywhere] hover:underline focus-visible:ring-2"
+                  >
+                    {document.title}
+                  </Link>
+                  {document.tags.map((tag) => (
+                    <TagChip key={tag}>{tag}</TagChip>
+                  ))}
+                </span>
+                <span className="text-muted-foreground text-xs tabular-nums">
+                  {formatDate(document.createdAt)}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

@@ -15,6 +15,34 @@ export class CompanyNotFoundError extends Error {
   }
 }
 
+/** Deliberately says "Company not found": it must not confirm that a company
+ *  it refused actually exists, because a not-yours answer and a not-there
+ *  answer are the same answer (§12.2). */
+export class CompanyNotOwnedError extends Error {
+  constructor() {
+    super("Company not found")
+    this.name = "CompanyNotOwnedError"
+  }
+}
+
+/**
+ * The cross-entity guard for every write that carries a client-supplied
+ * `companyId` — applications and documents both.
+ *
+ * Repository ownership scoping alone cannot catch this: the row being written
+ * is the caller's OWN, carrying the caller's own `userId`, so every
+ * `where: { userId }` clause on the write still matches. The foreign id in the
+ * payload is arbitrary client input and nothing but an explicit lookup will
+ * refuse it.
+ *
+ * Call it on create and update whenever `companyId` is present; skip it when it
+ * is undefined, because unlinking is always allowed.
+ */
+export async function assertCompanyOwned(userId: string, companyId: string): Promise<void> {
+  const company = await companyRepository.findById(userId, companyId)
+  if (!company) throw new CompanyNotOwnedError()
+}
+
 export class CompanyHasApplicationsError extends Error {
   constructor(public readonly count: number) {
     super(

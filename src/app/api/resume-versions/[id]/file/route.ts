@@ -1,12 +1,16 @@
 import { auth } from "@/lib/auth/auth"
-import { contentDisposition } from "@/server/files/content-disposition"
+import { fileResponse } from "@/server/files/file-response"
 import { PDF_CONTENT_TYPE } from "@/server/files/pdf"
 import { ResumeVersionNotFoundError, readVersionFile } from "@/server/services/resume-service"
 
 /**
- * The only route that emits uploaded bytes (§8.4). It takes a row id, never a
+ * The only route that emits resume bytes (§8.4). It takes a row id, never a
  * storage key, and the id is authorisation-checked rather than secret:
  * guessing a valid one gets a 404, not a file.
+ *
+ * The header set itself lives in `file-response.ts`, shared with the document
+ * vault's route (Phase 4 §5.2): the day a header needs adding, one file should
+ * change rather than two.
  */
 
 /**
@@ -40,31 +44,16 @@ export async function GET(
   }
 
   const { version, bytes } = file
-  const download = new URL(request.url).searchParams.get("download") === "1"
 
-  // Re-wrapped because the driver's Uint8Array is generic over ArrayBufferLike
-  // (it may be a SharedArrayBuffer for all the type knows) and BodyInit is not.
-  // A copy is irrelevant against a 10MB ceiling and beats a cast.
-  return new Response(new Uint8Array(bytes), {
-    headers: {
-      // A server-chosen literal. Never the declared or stored value echoed
-      // back, so the response cannot be typed by whoever uploaded it — which,
-      // with nosniff below, is what makes a PDF/HTML polyglot inert.
-      "Content-Type": PDF_CONTENT_TYPE,
-      "X-Content-Type-Options": "nosniff",
-      // Generated, never interpolated: the filename is user-supplied text
-      // going into a header, which is a header-injection vector.
-      "Content-Disposition": contentDisposition(
-        download ? "attachment" : "inline",
-        version.originalFilename
-      ),
-      "Cache-Control": "private, no-store",
-      // At a 10MB ceiling the whole object is one response; advertising ranges
-      // we do not implement makes viewers retry.
-      "Accept-Ranges": "none",
-      // The buffer's length, not `sizeBytes` from the row — a mismatch would
-      // truncate the response. The column is for display.
-      "Content-Length": String(bytes.byteLength),
-    },
+  return fileResponse({
+    bytes,
+    // The constant, not `version.contentType`: this path accepts one type and
+    // the response must not be typeable by whoever uploaded the row.
+    storedContentType: PDF_CONTENT_TYPE,
+    filename: version.originalFilename,
+    // Explicit, so this route's output is what it has always been rather than
+    // the shared module's generic default.
+    fallbackFilename: "resume.pdf",
+    download: new URL(request.url).searchParams.get("download") === "1",
   })
 }

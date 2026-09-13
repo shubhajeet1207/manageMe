@@ -8,11 +8,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TagChip } from "@/components/tag-chip"
 import type { ResumeLibraryItem } from "@/server/services/resume-service"
 import { DeleteResumeDialog } from "./delete-resume-dialog"
 import { formatDate } from "./format"
 import { ResumeSheet } from "./resume-sheet"
-import { SkillChip } from "./skill-chip"
 
 /** Enough to recognise a slot by — "this is the Go and Kubernetes one" —
  *  without the column becoming the row. The rest are counted, and named in the
@@ -52,7 +52,7 @@ export function ResumeTable({ resumes }: { resumes: ResumeLibraryItem[] }) {
                 ) : (
                   <span className="flex flex-wrap items-center gap-1">
                     {resume.skills.slice(0, VISIBLE_SKILLS).map((skill) => (
-                      <SkillChip key={skill}>{skill}</SkillChip>
+                      <TagChip key={skill}>{skill}</TagChip>
                     ))}
                     {resume.skills.length > VISIBLE_SKILLS ? (
                       <span

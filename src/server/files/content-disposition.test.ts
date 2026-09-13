@@ -60,12 +60,33 @@ describe("contentDisposition", () => {
     expect(header).toContain("%C3%A9")
   })
 
-  it("falls back to resume.pdf when nothing survives sanitising", () => {
-    expect(contentDisposition("inline", "文件")).toContain('filename="resume.pdf"')
+  it("falls back to the caller's fallback when nothing survives sanitising", () => {
+    expect(contentDisposition("inline", "文件", "resume.pdf")).toContain('filename="resume.pdf"')
+    expect(contentDisposition("inline", "文件", "document.png")).toContain(
+      'filename="document.png"'
+    )
   })
 
-  it("falls back to resume.pdf for an empty filename", () => {
-    expect(contentDisposition("inline", "")).toContain('filename="resume.pdf"')
+  it("falls back to the caller's fallback for an empty filename", () => {
+    expect(contentDisposition("inline", "", "resume.pdf")).toContain('filename="resume.pdf"')
+  })
+
+  it("falls back to a generic name when the caller names none", () => {
+    // The fallback is the caller's concern, not this module's: it has no
+    // business knowing whether a resume or a payslip asked.
+    expect(contentDisposition("inline", "文件")).toContain('filename="download"')
+    expect(contentDisposition("attachment", "")).toBe(
+      `attachment; filename="download"; filename*=UTF-8''download`
+    )
+  })
+
+  it("uses the fallback only where it is needed, keeping the real name in filename*", () => {
+    // A non-ASCII name survives sanitising, so only the ASCII parameter — which
+    // cannot carry it — falls back. Replacing both would throw away the one
+    // parameter a modern browser actually reads.
+    expect(contentDisposition("inline", "文件", "certificate.jpg")).toBe(
+      `inline; filename="certificate.jpg"; filename*=UTF-8''%E6%96%87%E4%BB%B6`
+    )
   })
 
   it("truncates a very long filename to exactly the cap", () => {

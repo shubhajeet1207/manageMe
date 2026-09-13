@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { tagList } from "@/server/validators/tags"
 import { MAX_UPLOAD_BYTES, PDF_CONTENT_TYPE } from "@/server/files/pdf"
 
 // `.optional()` MUST be the outermost wrapper — see the note in
@@ -53,38 +54,14 @@ export const MAX_RESUME_SKILLS = 50
 export const MAX_SKILL_LENGTH = 50
 export const MAX_PROJECT_DESCRIPTION_LENGTH = 2000
 
-/**
- * Deduplicated case-insensitively — "React" and "react" are one tag, not two —
- * keeping the first spelling the user typed, because a tag list that silently
- * recases what was entered reads as a bug.
- */
-function dedupeSkills(skills: string[]): string[] {
-  const seen = new Set<string>()
-  const kept: string[] = []
-  for (const skill of skills) {
-    const key = skill.toLocaleLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-    kept.push(skill)
-  }
-  return kept
-}
-
-// The cap is refined AFTER the dedupe transform so it counts what is stored:
-// 51 entries of which two are the same tag is a 50-skill resume.
-const skillList = z
-  .array(
-    z
-      .string()
-      .trim()
-      .min(1, "Skills cannot be blank")
-      .max(MAX_SKILL_LENGTH, `Each skill must be ${MAX_SKILL_LENGTH} characters or less`)
-  )
-  .transform(dedupeSkills)
-  .refine(
-    (skills) => skills.length <= MAX_RESUME_SKILLS,
-    `Add at most ${MAX_RESUME_SKILLS} skills`
-  )
+// The case-insensitive dedupe and the after-dedupe cap now live in
+// validators/tags.ts, because Link.tags is the second caller and two copies of
+// a dedupe rule is how two tag fields start disagreeing.
+const skillList = tagList({
+  max: MAX_RESUME_SKILLS,
+  maxLength: MAX_SKILL_LENGTH,
+  noun: "skills",
+})
 
 export const setResumeSkillsSchema = z.object({
   resumeId: z.string().min(1),
