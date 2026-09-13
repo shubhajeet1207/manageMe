@@ -69,7 +69,7 @@ export function ResumeTable({ resumes }: { resumes: ResumeLibraryItem[] }) {
                 {resume.currentVersion ? (
                   <span>
                     {resume.currentVersion.label}{" "}
-                    <span className="text-muted-foreground tabular-nums">
+                    <span className="text-muted-foreground whitespace-nowrap [overflow-wrap:normal] tabular-nums">
                       · {formatDate(resume.currentVersion.createdAt)}
                     </span>
                   </span>

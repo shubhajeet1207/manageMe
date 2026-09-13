@@ -49,7 +49,7 @@ export function ResumeVersionSelect({
     return (
       <div className="space-y-2">
         <Select disabled value={NO_RESUME_VERSION} onValueChange={onChangeValue}>
-          <SelectTrigger aria-label="Resume" className="w-full">
+          <SelectTrigger id="resumeVersion" aria-label="Resume" className="w-full">
             <SelectValue placeholder="No resumes yet" />
           </SelectTrigger>
           <SelectContent>
@@ -67,19 +67,37 @@ export function ResumeVersionSelect({
     )
   }
 
+  // The trigger renders its own children rather than mirroring the matching
+  // SelectItem's, so the closed value can lead with the slot name — the same
+  // order the applications table uses — without changing what each option in
+  // the open listbox reads (already grouped under that name).
+  const selected = versions.find((version) => version.id === value)
+
   return (
     <Select value={value || NO_RESUME_VERSION} onValueChange={onChangeValue}>
-      <SelectTrigger aria-label="Resume" className="w-full">
-        <SelectValue placeholder="None" />
+      <SelectTrigger id="resumeVersion" aria-label="Resume" className="w-full">
+        <SelectValue placeholder="None">
+          {selected
+            ? `${selected.resume.name} · ${selected.label} · ${selected.createdAt.toISOString().slice(0, 10)}`
+            : ""}
+        </SelectValue>
       </SelectTrigger>
-      <SelectContent>
+      <SelectContent
+        position="popper"
+        align="start"
+        sideOffset={4}
+        collisionPadding={16}
+        className="w-[var(--radix-select-trigger-width)]"
+      >
         <SelectItem value={NO_RESUME_VERSION}>None</SelectItem>
         {groupByResume(versions).map((group) => (
           <SelectGroup key={group.resumeId}>
             <SelectLabel>{group.resumeName}</SelectLabel>
             {group.versions.map((version) => (
               <SelectItem key={version.id} value={version.id}>
-                {version.label} · {version.createdAt.toISOString().slice(0, 10)}
+                <span className="min-w-0 truncate">
+                  {version.label} · {version.createdAt.toISOString().slice(0, 10)}
+                </span>
               </SelectItem>
             ))}
           </SelectGroup>

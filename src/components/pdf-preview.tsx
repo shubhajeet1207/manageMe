@@ -10,11 +10,16 @@ import { cn } from "@/lib/utils"
  * `src` is always the authorising route. The component cannot be handed a raw
  * file path because none exists.
  *
- * Fixed aspect ratio and a minimum height so the page does not reflow when the
- * viewer draws, and no spinner: `<object>`'s load event is unreliable across
- * browsers and the native viewer draws its own loading state.
+ * Full width, viewport-relative height rather than a fixed aspect ratio. A
+ * resume is portrait (8.5x11); a landscape-shaped box letterboxes it small no
+ * matter how wide the box gets, since the native viewer fits the page to
+ * whichever dimension is tighter. A portrait aspect ratio would fix that, but
+ * tied to the full content width it computes a ~1460px-tall box at 1440 —
+ * viewport-relative height is the more predictable knob. No spinner:
+ * `<object>`'s load event is unreliable across browsers and the native viewer
+ * draws its own loading state.
  */
-export const PREVIEW_BOX = "aspect-[4/3] max-h-[70vh] min-h-[24rem] w-full max-w-4xl"
+export const PREVIEW_BOX = "h-[80vh] min-h-[28rem] w-full"
 
 export function PdfPreview({
   src,

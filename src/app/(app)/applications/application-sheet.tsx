@@ -200,7 +200,7 @@ export function ApplicationSheet({
           </div>
 
           <div className="space-y-2">
-            <Label>Resume</Label>
+            <Label htmlFor="resumeVersion">Resume</Label>
             <ResumeVersionSelect
               versions={versions}
               value={resumeVersionId}

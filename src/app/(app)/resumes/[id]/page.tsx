@@ -1,3 +1,4 @@
+import { ExternalLinkIcon } from "lucide-react"
 import { notFound, redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { ResumeNotFoundError, getResumeDetail } from "@/server/services/resume-service"
@@ -82,7 +83,22 @@ export default async function ResumeDetailPage({
       ) : null}
 
       <div className="space-y-3">
-        <SectionHeading>Preview</SectionHeading>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <SectionHeading>Preview</SectionHeading>
+          {current ? (
+            <Button variant="outline" size="sm" asChild>
+              <a
+                href={`/api/resume-versions/${current.id}/file`}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={`Open ${current.label} in a new tab`}
+              >
+                <ExternalLinkIcon className="size-3.5" />
+                Open full screen
+              </a>
+            </Button>
+          ) : null}
+        </div>
         {current ? (
           <PdfPreview
             src={`/api/resume-versions/${current.id}/file`}
