@@ -1,20 +1,12 @@
 import { createHash } from "node:crypto"
 import type { NextAuthConfig } from "next-auth"
 import { prisma } from "@/lib/db/prisma"
-import { validateEnv } from "@/lib/env"
 
-/**
- * Boot-time environment validation, run here because this module is on the
- * import path of BOTH entry points the server has: `src/proxy.ts` (every
- * matched request) and `src/lib/auth/auth.ts` (every Server Action and every
- * authenticated page). A missing AUTH_SECRET therefore fails the process
- * instead of failing the first person who types a password.
- *
- * `src/instrumentation.ts`'s `register()` hook is the canonical home for this in
- * Next 16 and should take it over when that file exists; until then this is the
- * earliest module in the app that is guaranteed to load.
- */
-validateEnv()
+// Environment validation moved to `src/instrumentation.ts`, exactly as the note
+// that used to sit here anticipated. Running it at module scope meant it also
+// ran during `next build` — collecting page data for /api/auth/[...nextauth]
+// evaluates this module — which failed the build wherever the environment is
+// legitimately absent, including any Vercel variable marked "Sensitive".
 
 /**
  * The origin next-auth will rewrite every request onto, if one is configured.
