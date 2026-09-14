@@ -534,10 +534,20 @@ Stopped at the user's request. `main` is clean and green: **824 tests across
 
 ### Start here tomorrow
 
-**Wire the status-event recorder.** `e5068c5` added `ApplicationStatusEvent`
-— schema, migration (already applied to the database) and repository, all
-tested — but **nothing writes to it**. The table exists and stays empty, so
-analytics built on it today would show nothing.
+**CORRECTION (2026-09-14): the recorder IS wired.** The note below was wrong.
+`e5068c5` put the chokepoint in the *repository*, not the service — I grepped
+the service layer, found nothing, and concluded it was unwired. It is
+`commitStatusWrite` in `application-repository.ts`: a wrapper (not a helper)
+that `create`, `update` and `updateStatus` all route through, so none of them
+can write a status without recording an event. Serializable isolation with
+retry, atomic insert, correct source per path, 44 tests. The repository is the
+better place for it than the service — a lower chokepoint catches more callers.
+
+The only residual bypass is calling `prisma.application` directly, outside the
+repository, which no application code does.
+
+**What actually remains:** backfill (existing applications predate the recorder
+and have no events), then the Phase 6 analytics UI.
 
 What remains, from `docs/superpowers/specs/2026-09-13-phase6-analytics-design.md`:
 
