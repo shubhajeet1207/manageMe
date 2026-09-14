@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth/auth"
 import { fileResponse } from "@/server/files/file-response"
 import { PDF_CONTENT_TYPE } from "@/server/files/pdf"
-import { ResumeVersionNotFoundError, readVersionFile } from "@/server/services/resume-service"
+import { ResumeVersionNotFoundError, openVersionFile } from "@/server/services/resume-service"
 import { hasControlChars } from "@/server/validators/limits"
 
 /**
@@ -39,15 +39,22 @@ export async function GET(
   // instead of simply not matching a row.
   if (hasControlChars(id)) return notFound()
 
+  const download = new URL(request.url).searchParams.get("download") === "1"
+
   let file
   try {
-    file = await readVersionFile(session.user.id, id)
+    file = await openVersionFile(session.user.id, id, download)
   } catch (error) {
     // Not found, not yours, and a row whose object has gone missing all answer
     // the same way, with no body distinction between them.
     if (error instanceof ResumeVersionNotFoundError) return notFound()
     return new Response(null, { status: 500 })
   }
+
+  // The signed URL already carries the type and disposition this route would
+  // have set; 302 rather than 301 because it expires in minutes and must never
+  // be cached as permanent.
+  if (file.kind === "redirect") return Response.redirect(file.url, 302)
 
   const { version, bytes } = file
 
@@ -60,6 +67,6 @@ export async function GET(
     // Explicit, so this route's output is what it has always been rather than
     // the shared module's generic default.
     fallbackFilename: "resume.pdf",
-    download: new URL(request.url).searchParams.get("download") === "1",
+    download,
   })
 }

@@ -1,4 +1,5 @@
 import { createLocalStorageDriver } from "./local-driver"
+import { createR2StorageDriver } from "./r2-driver"
 import type { StorageDriver } from "./storage"
 
 export type { StorageDriver } from "./storage"
@@ -17,7 +18,9 @@ export function getStorage(): StorageDriver {
   switch (driver) {
     case "local":
       return createLocalStorageDriver()
+    case "r2":
+      return createR2StorageDriver()
     default:
-      throw new Error(`Unknown STORAGE_DRIVER "${driver}". Supported drivers: local.`)
+      throw new Error(`Unknown STORAGE_DRIVER "${driver}". Supported drivers: local, r2.`)
   }
 }

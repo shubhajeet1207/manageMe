@@ -28,4 +28,41 @@ describe("getStorage", () => {
     process.env.STORAGE_DRIVER = "s4"
     expect(() => getStorage()).toThrow(/STORAGE_DRIVER/)
   })
+
+  it("names the R2 variable that is missing, rather than failing at first upload", () => {
+    // The whole point of constructing the driver eagerly: a deploy with one
+    // unset variable should break where someone is watching, not days later
+    // when a user first attaches a resume.
+    process.env.STORAGE_DRIVER = "r2"
+    for (const key of ["R2_ACCOUNT_ID", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"]) {
+      delete process.env[key]
+    }
+    expect(() => getStorage()).toThrow(/R2_ACCOUNT_ID/)
+  })
+
+  it("builds the R2 driver when every variable is present", async () => {
+    process.env.STORAGE_DRIVER = "r2"
+    process.env.R2_ACCOUNT_ID = "acct"
+    process.env.R2_ACCESS_KEY_ID = "key"
+    process.env.R2_SECRET_ACCESS_KEY = "secret"
+    process.env.R2_BUCKET = "bucket"
+
+    // Identified by its answer, the inverse of the local driver's: R2 CAN sign,
+    // and the signature is what lets a >4.5MB file leave a Vercel function.
+    const signed = await getStorage().url("resumes/u/a.pdf")
+    expect(signed).toContain("acct.r2.cloudflarestorage.com")
+    expect(signed).toContain("X-Amz-Signature")
+  })
+
+  it("refuses to sign a traversing key", async () => {
+    process.env.STORAGE_DRIVER = "r2"
+    process.env.R2_ACCOUNT_ID = "acct"
+    process.env.R2_ACCESS_KEY_ID = "key"
+    process.env.R2_SECRET_ACCESS_KEY = "secret"
+    process.env.R2_BUCKET = "bucket"
+
+    // The key gates are shared with the local driver precisely so a second
+    // driver cannot quietly ship without them.
+    await expect(getStorage().url("../../etc/passwd")).rejects.toThrow()
+  })
 })

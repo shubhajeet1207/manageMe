@@ -1,14 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { UnsafeStorageKeyError, type StorageDriver } from "./storage"
-
-/**
- * The whole key must match this: it admits no `.`-only segments, no
- * backslash, no NUL, no `%`, no whitespace, no leading `/`, and exactly one
- * dot — the extension's. `..` therefore cannot appear anywhere, because the
- * middle character class has no `.` in it.
- */
-const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9/_-]*\.[A-Za-z0-9]+$/
+import { assertSafeStorageKey, UnsafeStorageKeyError, type StorageDriver } from "./storage"
 
 /**
  * Resolve `key` to an absolute path inside `root`, refusing anything that is
@@ -20,12 +12,10 @@ const SAFE_KEY = /^[A-Za-z0-9][A-Za-z0-9/_-]*\.[A-Za-z0-9]+$/
  * loosened, which is exactly when it is wanted.
  */
 export function resolveStorageKey(root: string, key: string): string {
-  if (!SAFE_KEY.test(key)) throw new UnsafeStorageKeyError()
-
-  const segments = key.split("/")
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
-    throw new UnsafeStorageKeyError()
-  }
+  // The pattern and segment gates now live in storage.ts so both drivers
+  // share one definition; the path check below stays here because only a
+  // filesystem has a root to escape from.
+  assertSafeStorageKey(key)
 
   const base = path.resolve(root)
   const resolved = path.resolve(base, key)
@@ -78,7 +68,14 @@ export function createLocalStorageDriver(root: string = localStorageRoot()): Sto
 
     async url(): Promise<string | null> {
       // A local file has no URL. Returning null is the honest answer, and the
-      // §8.4 route is the single place a Phase 7 signed URL would be used.
+      // §8.4 route is the single place a signed URL is used.
+      return null
+    },
+
+    async presignPut(): Promise<string | null> {
+      // Nothing can PUT to a local path over HTTP. Null tells the caller to
+      // fall back to uploading through the server, which is correct in dev and
+      // is why the two paths must both keep working.
       return null
     },
   }

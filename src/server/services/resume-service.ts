@@ -10,6 +10,7 @@ import type {
 import { getStorage } from "@/server/storage"
 import { FileTooLargeError, StorageError } from "@/server/files/file-errors"
 import { PDF_CONTENT_TYPE, validatePdfUpload } from "@/server/files/pdf"
+import { contentDisposition } from "@/server/files/content-disposition"
 import type {
   CreateResumeInput,
   CreateResumeProjectInput,
@@ -320,6 +321,67 @@ export async function getVersionForDownload(
  * whose object is missing is a server-side problem, logged here and answered
  * with the same not-found the client gets for everything else.
  */
+/**
+ * Serve a version either by redirecting to a driver-signed URL or by handing
+ * back bytes, in ONE row lookup and one ownership check.
+ *
+ * The redirect exists because of a hard platform limit: a Vercel function's
+ * response body is capped at 4.5MB, so proxying a larger file through this
+ * process cannot work however the app is configured. A signed URL moves the
+ * bytes out of the function entirely.
+ *
+ * WHAT THE REDIRECT GIVES UP, stated rather than buried: a signed R2 URL
+ * carries the Content-Type and Content-Disposition we sign into it, but it
+ * cannot carry `X-Content-Type-Options: nosniff`, the CSP sandbox, or
+ * `Cross-Origin-Resource-Policy` — the §8.6 header set. The reason that is
+ * acceptable here and would NOT be on our own origin: R2 serves from
+ * `*.r2.cloudflarestorage.com`, so a file that somehow executed would execute
+ * cross-origin, with no access to this app's cookies, session or DOM. The
+ * header set defends against same-origin execution, and a redirect removes the
+ * same-origin part of the threat along with the headers.
+ *
+ * A driver that cannot sign (local, in dev) returns null and the caller falls
+ * back to the byte path, which keeps the full header set. Both paths stay
+ * live, which is why neither may be deleted as "unused".
+ */
+export async function openVersionFile(
+  userId: string,
+  versionId: string,
+  download: boolean
+): Promise<
+  { kind: "redirect"; url: string } | { kind: "bytes"; version: ResumeVersion; bytes: Uint8Array }
+> {
+  const version = await getVersionForDownload(userId, versionId)
+  const storage = getStorage()
+
+  const signed = await storage.url(version.storageKey, {
+    // The constant, not the row's column: this path serves one type, and the
+    // response must not be typeable by whoever uploaded the row.
+    contentType: PDF_CONTENT_TYPE,
+    // Generated, never interpolated — the filename is user-supplied text going
+    // into a header even when that header is signed into a URL.
+    disposition: contentDisposition(
+      download ? "attachment" : "inline",
+      version.originalFilename,
+      "resume.pdf"
+    ),
+  })
+  if (signed) return { kind: "redirect", url: signed }
+
+  let bytes: Uint8Array | null
+  try {
+    bytes = await storage.get(version.storageKey)
+  } catch (error) {
+    console.error("Failed to read stored object", version.storageKey, error)
+    throw new StorageError()
+  }
+  if (!bytes) {
+    console.error("Resume version row has no stored object", version.id, version.storageKey)
+    throw new ResumeVersionNotFoundError()
+  }
+  return { kind: "bytes", version, bytes }
+}
+
 export async function readVersionFile(
   userId: string,
   versionId: string
