@@ -524,3 +524,52 @@ and a plan in `docs/superpowers/plans/`; Phase 3 has only the spec. Nothing is
 broken by this, but the record of *why* Phase 3 was built the way it was is
 thinner than for its neighbours, which matters when Phase 8 starts changing its
 storage and quota behaviour.
+
+---
+
+## Resume point — 2026-09-14
+
+Stopped at the user's request. `main` is clean and green: **824 tests across
+51 files**, 0 lint errors, typecheck clean.
+
+### Start here tomorrow
+
+**Wire the status-event recorder.** `e5068c5` added `ApplicationStatusEvent`
+— schema, migration (already applied to the database) and repository, all
+tested — but **nothing writes to it**. The table exists and stays empty, so
+analytics built on it today would show nothing.
+
+What remains, from `docs/superpowers/specs/2026-09-13-phase6-analytics-design.md`:
+
+1. A single service-layer chokepoint that records a transition, so a future
+   fourth write path cannot silently bypass it.
+2. Call it from **all three** existing status-write paths — `createApplication`
+   (the form carries a full status select, so a row can be born as `INTERVIEW`),
+   `changeStatus` (the board drag), and `updateApplication` (the edit sheet).
+   Missing one produces permanently wrong analytics with no error.
+3. The status write and its event row in **one transaction**.
+4. Backfill one synthetic row per existing application, marked `BACKFILL`, and
+   keep it visibly distinguishable in the UI — its `changedAt` comes from
+   `updatedAt`, which moves on any edit, so it is an approximation.
+5. Verify each path's test genuinely bites: remove the recording, watch that
+   test fail, restore it. A recorder with a passing test and a missed path has
+   shipped twice in this codebase already.
+
+Then Phase 6 proper: dashboard widgets, career analytics, activity timeline.
+
+### Why the previous attempt stopped
+
+The workflow's history agent stalled on all six retry attempts. The schema and
+repository it had already produced are sound and are what `e5068c5` preserves.
+
+### Still outstanding beyond Phase 6
+
+- **No E2E for Phases 4 and 5** — both specs call for 11 scenarios each, 22
+  total, none written. This matters more than usual: unit tests call services
+  directly and never cross the Server Action boundary, which is exactly where
+  the worst bugs of 2026-09-13 lived (a 1MB body truncation that silently
+  stored corrupt uploads, and an unvalidated delete id that could wipe the
+  whole document vault in one request).
+- **Phase 7 is empty** — no CI, no security headers, no CSP anywhere, no rate
+  limiting, no observability. The storage driver is still local-disk only and
+  **cannot work on serverless**, which blocks deployment outright.
