@@ -36,13 +36,17 @@ const MIN_AUTH_SECRET_LENGTH = 32
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/
 
 /**
- * Must stay in step with the `switch` in `getStorage()`
- * (src/server/storage/index.ts) — that function is the authority on what the app
- * can actually do with the value, this list is only what lets a typo fail at
- * boot instead of at the first upload. Phase 7's cloud driver adds an entry in
- * both places.
+ * The one list of drivers the app accepts. `getStorage()`
+ * (src/server/storage/index.ts) imports it rather than keeping its own copy,
+ * and a test there asserts every entry here actually constructs — because the
+ * previous version of this comment asked the two to "stay in step" by hand and
+ * they promptly did not: `r2` and `b2` shipped in the switch while this list
+ * still said `local`, which would have rejected a correct deploy at boot.
+ *
+ * The direction matters: lib may not import from server, so the constant lives
+ * here and the server module reads it.
  */
-export const SUPPORTED_STORAGE_DRIVERS = ["local"] as const
+export const SUPPORTED_STORAGE_DRIVERS = ["local", "r2", "b2"] as const
 
 /** What `getStorage()` falls back to, so an unset variable is not a problem. */
 export const DEFAULT_STORAGE_DRIVER = "local"

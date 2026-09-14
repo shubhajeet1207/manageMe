@@ -1,6 +1,7 @@
 import { createLocalStorageDriver } from "./local-driver"
 import { createS3StorageDriver, type S3DriverConfig } from "./s3-driver"
 import type { StorageDriver } from "./storage"
+import { SUPPORTED_STORAGE_DRIVERS } from "@/lib/env"
 
 export type { StorageDriver } from "./storage"
 export { UnsafeStorageKeyError } from "./storage"
@@ -94,6 +95,11 @@ export function getStorage(): StorageDriver {
     case "b2":
       return createS3StorageDriver(readB2Config())
     default:
-      throw new Error(`Unknown STORAGE_DRIVER "${driver}". Supported drivers: local, r2, b2.`)
+      // The list comes from lib/env.ts so the boot validator and this switch
+      // cannot disagree about what is supported — they did once, and a correct
+      // deploy was rejected at boot for it.
+      throw new Error(
+        `Unknown STORAGE_DRIVER "${driver}". Supported drivers: ${SUPPORTED_STORAGE_DRIVERS.join(", ")}.`
+      )
   }
 }

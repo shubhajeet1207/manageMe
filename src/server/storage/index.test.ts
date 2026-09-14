@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { getStorage } from "./index"
+import { SUPPORTED_STORAGE_DRIVERS } from "@/lib/env"
 
 const original = process.env.STORAGE_DRIVER
 
@@ -20,6 +21,29 @@ describe("getStorage", () => {
     process.env.STORAGE_DRIVER = "local"
     // The local driver's objects live outside the web root and have no URL.
     expect(await getStorage().url("resumes/u/a.pdf")).toBeNull()
+  })
+
+  /**
+   * The regression guard. `SUPPORTED_STORAGE_DRIVERS` is what the boot
+   * validator accepts and this switch is what can actually be built; they
+   * drifted once — `r2` and `b2` worked here while the validator still listed
+   * only `local`, so a correct deploy failed at boot with "not a supported
+   * driver". Asserting every listed driver constructs means the next one
+   * cannot ship half-wired.
+   */
+  it.each(SUPPORTED_STORAGE_DRIVERS)("can actually construct the supported driver %s", (driver) => {
+    process.env.STORAGE_DRIVER = driver
+    // Give every provider its variables; the irrelevant ones are ignored.
+    process.env.R2_ACCOUNT_ID = "acct"
+    process.env.R2_ACCESS_KEY_ID = "key"
+    process.env.R2_SECRET_ACCESS_KEY = "secret"
+    process.env.R2_BUCKET = "bucket"
+    process.env.B2_KEY_ID = "key"
+    process.env.B2_APPLICATION_KEY = "secret"
+    process.env.B2_ENDPOINT = "https://s3.us-west-004.backblazeb2.com"
+    process.env.B2_BUCKET = "bucket"
+
+    expect(() => getStorage()).not.toThrow()
   })
 
   it("throws on an unknown driver rather than silently falling back", () => {
