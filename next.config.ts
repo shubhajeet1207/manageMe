@@ -198,6 +198,28 @@ export function serverActionAllowedOrigins(appUrl: string | undefined): string[]
 }
 
 const nextConfig: NextConfig = {
+  /**
+   * `localStorageRoot()` builds its path from `process.cwd()` and an env var,
+   * which Next's file tracer cannot resolve statically — so it gives up and
+   * traces the WHOLE project into every serverless function, which is what the
+   * "Dynamic filesystem access causes tracing of the whole project" build
+   * warning is reporting.
+   *
+   * These directories are never read at runtime, and on a serverless deploy the
+   * local driver that triggered the warning is never even constructed. Excluding
+   * them keeps the bundle — and therefore the cold start — off the docs tree.
+   */
+  outputFileTracingExcludes: {
+    "**": [
+      "./docs/**",
+      "./e2e/**",
+      "./.superpowers/**",
+      "./.uploads/**",
+      "./test-results/**",
+      "./playwright-report/**",
+    ],
+  },
+
   // Next 16 logs every incoming request in dev, arguments included — so a
   // Server Action call is printed to the terminal payload and all. For
   // `createCredentialAction`/`updateCredentialAction` that payload IS the
