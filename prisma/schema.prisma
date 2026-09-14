@@ -26,6 +26,7 @@ model User {
   links          Link[]
   quickDropItems QuickDropItem[]
   credentials    Credential[]
+  statusEvents   ApplicationStatusEvent[]
 }
 
 enum ApplicationStatus {
@@ -84,18 +85,67 @@ model Application {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  company       Company        @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company       Company                  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   // Restrict, matching Application.company: a cascade would silently destroy
   // the record of what was sent, which is the kind of loss noticed a month
   // too late. The service checks the count first and raises ResumeInUseError;
   // this constraint is the backstop, not the messenger.
-  resumeVersion ResumeVersion? @relation(fields: [resumeVersionId], references: [id], onDelete: Restrict)
+  resumeVersion ResumeVersion?           @relation(fields: [resumeVersionId], references: [id], onDelete: Restrict)
   tasks         Task[]
+  statusEvents  ApplicationStatusEvent[]
 
   @@index([userId, status])
   @@index([userId, companyId])
   @@index([userId, resumeVersionId])
+}
+
+/// One recorded status transition. Append-only: there is no update operation
+/// and no delete operation anywhere in the codebase, and the only INSERT is
+/// inside application-repository.ts's chokepoint (§7.2).
+///
+/// Three paths can change Application.status — create, updateStatus (the board
+/// drag) and update (the edit sheet, which writes status as one field of a
+/// full-row write). The third is the one a reviewer misses; all three route
+/// through commitStatusWrite and none of them touches prisma.application
+/// directly.
+model ApplicationStatusEvent {
+  id            String             @id @default(cuid())
+  /// Denormalised from Application for the same reason as ResumeVersion.userId
+  /// and ResumeProject.userId (§5.1): it keeps every where-clause a top-level
+  /// scalar filter. It matters more here, because a dropped filter on an
+  /// aggregate is a wrong chart rather than a visible leak.
+  userId        String
+  applicationId String
+  /// Null on the genesis event and nowhere else. Stored rather than derived,
+  /// because a redundant column is the only thing that makes a missed write
+  /// detectable: a bypassed write shows up as the NEXT event's fromStatus
+  /// contradicting its predecessor's toStatus (§6.2, §7.5).
+  fromStatus    ApplicationStatus?
+  toStatus      ApplicationStatus
+  changedAt     DateTime           @default(now())
+  /// Which path wrote this row. BACKFILL rows are synthetic — their changedAt
+  /// is the application's updatedAt, which moves on any column write — and are
+  /// excluded from every duration, conversion and funnel figure (§8.3).
+  source        StatusEventSource
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Cascade, unlike Application.company's Restrict (§6.4): deleting an
+  /// application usually means "this was never real", and keeping its history
+  /// would inflate every funnel denominator with a row the user disowned. The
+  /// accepted cost is that conversion rates recompute when the user tidies up.
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, applicationId, changedAt])
+  @@index([userId, changedAt])
+  @@index([userId, toStatus])
+}
+
+enum StatusEventSource {
+  CREATE
+  BOARD_DRAG
+  EDIT_FORM
+  BACKFILL
 }
 
 /// A named resume slot ("Backend SWE", "Data roles") holding an ordered
@@ -283,6 +333,9 @@ model Task {
   application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
 
   @@index([userId, status, dueDate])
+  /// The activity timeline makes completedAt a sort key for the first time
+  /// (§6.6); [userId, status, dueDate] does not serve that at all.
+  @@index([userId, completedAt])
   @@index([userId, projectId])
   @@index([userId, applicationId])
 }
