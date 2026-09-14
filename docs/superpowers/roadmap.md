@@ -583,3 +583,63 @@ repository it had already produced are sound and are what `e5068c5` preserves.
 - **Phase 7 is empty** — no CI, no security headers, no CSP anywhere, no rate
   limiting, no observability. The storage driver is still local-disk only and
   **cannot work on serverless**, which blocks deployment outright.
+
+---
+
+## Resume point — 2026-09-14, later the same day
+
+**This supersedes the resume point above.** `main` is green: **837 tests
+across 52 files**, typecheck clean, eslint clean, tree clean at `9689fe4`.
+
+### What shipped
+
+- `ed82074` — the serialization write-conflict fix (below).
+- `9689fe4` — `/analytics`, and the dashboard's four Phase 6b corrections.
+- `5eb7c0c` — the analytics service and repository (earlier).
+
+Both pages were verified **rendered**, not merely typechecked: a signed-in
+session against the running dev server returns 200 for `/analytics` and
+`/dashboard`, with the funnel bars, the skip-detection line, and all three
+new dashboard tiles present in the HTML.
+
+### The write-conflict fix, because the cause is non-obvious
+
+The suite was failing 3-7 tests per run, a different set each time, all
+`TransactionWriteConflict`. The conflicts hit writes to **different rows
+belonging to different users**, which row-level conflicts cannot explain.
+
+Cause: SSI takes predicate locks per **page**, and `Application` and
+`ApplicationStatusEvent` are small enough that every row shares one heap
+page — so a page lock is effectively a table lock. `enable_seqscan = off`
+narrows a sequential scan to an index scan but cannot subdivide a page.
+This is the documented false-positive case for SSI on small tables, and
+the prescribed remedy is to retry, not to tune the query.
+
+The retry policy in `commitStatusWrite` is now 10 attempts with **full
+jitter** (a draw from the whole interval, not a fixed delay plus noise —
+a fixed backoff re-synchronizes the transactions that just collided).
+
+**Caveat worth knowing before touching it again:** the attempt count is
+near its useful ceiling. Going 3 → 6 removed most failures; 6 → 10 removed
+the rest but raised total test time 1341s → 1510s, which is the signature
+of trading fast failures for slow successes. Do not raise it further — past
+this point contended writes start hitting the 30s test timeout instead.
+If flakiness returns, the lever is **concurrency, not patience**: cap
+vitest's thread pool (`poolOptions.threads.maxThreads`), since the suite's
+~6-way concurrent write load is an artifact of the thread pool and not
+something this single-user product ever produces.
+
+### Phase 6b — three of nine items done
+
+Done: funnel and conversion charts; the dashboard `groupBy` replacing
+`listApplications`; `dashboard/loading.tsx` skeletoning the pipeline strip.
+
+Remaining: time-in-stage / velocity / aging; the activity timeline; resume
+A/B on *reached* stage; per-company counts; table sorting (Phase 2's
+unshipped §7 promise); vault full-text search (conditional on row counts).
+
+### Unchanged and still outstanding
+
+No E2E for Phases 4 and 5 (22 scenarios specified, none written), and
+Phase 7 is still empty — the local-disk storage driver cannot work on
+serverless, which blocks deployment outright.
