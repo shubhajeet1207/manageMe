@@ -38,6 +38,28 @@ function readR2Config(): S3DriverConfig {
   }
 }
 
+/**
+ * Backblaze's real regions, as an allowlist rather than a shape check.
+ *
+ * A pattern alone is not enough, and this is not hypothetical: a deploy set
+ * `us-west-005`, which matches `s3.<anything>.backblazeb2.com` perfectly, sailed
+ * through validation, and failed at DNS with ENOTFOUND on the first upload —
+ * surfaced to the user as "Something went wrong". The region exists as
+ * `us-east-005`; only the direction was wrong, which no shape check can catch.
+ *
+ * The cost of this list is that a genuinely new Backblaze region needs a line
+ * added here. That is the right trade: a new region is a rare, deliberate
+ * event, while a mistyped one is a silent outage discovered by a user.
+ */
+const B2_REGIONS = [
+  "us-west-000",
+  "us-west-001",
+  "us-west-002",
+  "us-west-004",
+  "us-east-005",
+  "eu-central-003",
+] as const
+
 /** Matches the exact string Backblaze's dashboard shows as the bucket's "S3
  *  compatible" endpoint, e.g. `https://s3.us-west-004.backblazeb2.com`. */
 const B2_ENDPOINT_PATTERN = /^https:\/\/s3\.([a-z0-9-]+)\.backblazeb2\.com$/
@@ -65,6 +87,16 @@ function readB2Config(): S3DriverConfig {
       `B2_ENDPOINT "${endpoint}" doesn't look like a Backblaze S3 endpoint. Expected ` +
         `https://s3.<region>.backblazeb2.com — copy it verbatim from the bucket's page ` +
         `in the B2 dashboard rather than typing it by hand.`
+    )
+  }
+
+  // Checked against real regions, not just the shape: a plausible-but-wrong
+  // region resolves to nothing and fails at the first upload rather than here.
+  if (!(B2_REGIONS as readonly string[]).includes(match[1])) {
+    throw new Error(
+      `B2_ENDPOINT "${endpoint}" names region "${match[1]}", which is not a Backblaze ` +
+        `region. Valid regions: ${B2_REGIONS.join(", ")}. Check the Endpoint field on ` +
+        `the bucket's page — "us-west-005" in particular does not exist, "us-east-005" does.`
     )
   }
 

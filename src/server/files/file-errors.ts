@@ -21,7 +21,13 @@ export class FileTooLargeError extends Error {
  *  filesystem path ever reaches the client (§12.2). */
 export class StorageError extends Error {
   constructor() {
-    super("Something went wrong. Please try again.")
+    // Names the step that failed without naming the cause. "Something went
+    // wrong" was indistinguishable from every other failure in the app, so a
+    // misconfigured storage backend and a validation slip read identically to
+    // the user and to whoever they reported it to. Which provider, which
+    // bucket, and which host could not be resolved stay in the server log
+    // where they belong.
+    super("We couldn't save that file. Please try again.")
     this.name = "StorageError"
   }
 }

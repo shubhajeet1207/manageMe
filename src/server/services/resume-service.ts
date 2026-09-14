@@ -249,7 +249,20 @@ export async function uploadResumeVersion(
   //    it — `originalFilename` is stored on the row for display only.
   const storageKey = `resumes/${userId}/${randomUUID()}.pdf`
 
-  const storage = getStorage()
+  // Inside the guard, not above it: `getStorage()` throws on a misconfigured
+  // deploy (an unknown driver, a missing or malformed provider variable), and
+  // outside a catch that error is not a StorageError, so the Server Action's
+  // fallback branch reported "Something went wrong" — the least useful
+  // sentence available — for a problem whose cause is named precisely in the
+  // exception it just swallowed.
+  let storage
+  try {
+    storage = getStorage()
+  } catch (error) {
+    console.error("Storage is misconfigured; upload cannot proceed", error)
+    throw new StorageError()
+  }
+
   try {
     await storage.put(storageKey, data.bytes, PDF_CONTENT_TYPE)
   } catch (error) {

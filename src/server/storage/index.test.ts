@@ -110,6 +110,19 @@ describe("getStorage", () => {
     expect(() => getStorage()).toThrow(/B2_ENDPOINT/)
   })
 
+  it("rejects a plausible-but-nonexistent B2 region", () => {
+    // The regression this exists for: a deploy set us-west-005, which matches
+    // the endpoint's shape perfectly and passed the old check, then failed at
+    // DNS with ENOTFOUND on the first upload. us-east-005 is the real one —
+    // only the direction was wrong, which no shape check can catch.
+    process.env.STORAGE_DRIVER = "b2"
+    process.env.B2_KEY_ID = "key"
+    process.env.B2_APPLICATION_KEY = "secret"
+    process.env.B2_ENDPOINT = "https://s3.us-west-005.backblazeb2.com"
+    process.env.B2_BUCKET = "bucket"
+    expect(() => getStorage()).toThrow(/us-west-005|not a Backblaze region/)
+  })
+
   it("builds the B2 driver when every variable is present", async () => {
     process.env.STORAGE_DRIVER = "b2"
     process.env.B2_KEY_ID = "key"
