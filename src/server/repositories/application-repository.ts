@@ -33,11 +33,44 @@ function isSerializationFailure(error: unknown): boolean {
 
 /**
  * Postgres's own guidance for Serializable is that the application must be
- * prepared to retry. The design spec (§7.3) budgets one retry; this budgets two,
- * with jittered backoff, because "effectively never" is not a correctness
- * argument and the second retry is free when it never fires.
+ * prepared to retry. The design spec (§7.3) budgets one retry. This budgets
+ * nine, because measurement showed the smaller budget was not a safety margin
+ * but a coin flip: at one retry the suite failed 3-7 tests per run, in a
+ * different set each time, all of them `TransactionWriteConflict`; at five it
+ * still failed one.
+ *
+ * Why conflicts are common here despite every write targeting ONE row by
+ * primary key: SSI takes predicate locks at PAGE granularity, and `Application`
+ * and `ApplicationStatusEvent` are small enough that every row shares a heap
+ * page. A page lock on a one-page table is a table lock, so two writes to
+ * unrelated rows — even two different users' rows — serialize against each
+ * other. `enable_seqscan = off` below narrows a sequential scan to an index
+ * scan, but it cannot subdivide a page. This is the documented false-positive
+ * case for SSI on small tables, and the prescribed answer is to retry, not to
+ * tune the query away.
+ *
+ * Retrying is always safe: a serialization failure aborts the transaction
+ * whole, so there is never a partial write to reconcile.
  */
-const SERIALIZATION_ATTEMPTS = 3
+const SERIALIZATION_ATTEMPTS = 10
+
+/**
+ * Full jitter — a random draw from the whole interval, not a fixed delay with
+ * noise added. This matters more than the attempt count: a fixed backoff
+ * re-synchronizes the very transactions that just collided, because they sleep
+ * the same duration and wake together to collide again. Drawing from
+ * [0, window) scatters them instead.
+ *
+ * Base and cap are sized for a remote database, where one attempt costs
+ * several round trips rather than a few milliseconds.
+ */
+const BACKOFF_BASE_MS = 50
+const BACKOFF_CAP_MS = 1_000
+
+function backoffFor(failures: number): number {
+  const window = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (failures - 1))
+  return Math.random() * window
+}
 
 /**
  * THE CHOKEPOINT (§7.2). The only place in the codebase that writes
@@ -142,7 +175,7 @@ async function commitStatusWrite<T extends { id: string; status: ApplicationStat
     } catch (error) {
       if (remaining === 0 || !isSerializationFailure(error)) throw error
       const failures = SERIALIZATION_ATTEMPTS - remaining
-      await new Promise((resolve) => setTimeout(resolve, failures * 20 + Math.random() * 20))
+      await new Promise((resolve) => setTimeout(resolve, backoffFor(failures)))
     }
   }
 }
