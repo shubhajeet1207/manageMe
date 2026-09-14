@@ -65,4 +65,46 @@ describe("getStorage", () => {
     // driver cannot quietly ship without them.
     await expect(getStorage().url("../../etc/passwd")).rejects.toThrow()
   })
+
+  it("names the B2 variable that is missing, rather than failing at first upload", () => {
+    process.env.STORAGE_DRIVER = "b2"
+    for (const key of ["B2_KEY_ID", "B2_APPLICATION_KEY", "B2_ENDPOINT", "B2_BUCKET"]) {
+      delete process.env[key]
+    }
+    expect(() => getStorage()).toThrow(/B2_KEY_ID/)
+  })
+
+  it("rejects a B2_ENDPOINT that isn't Backblaze's S3-compatible shape", () => {
+    // A wrong region signs with the wrong region and every request fails with
+    // an opaque 403 — this must fail at construction instead, naming the
+    // variable, not the symptom three requests later.
+    process.env.STORAGE_DRIVER = "b2"
+    process.env.B2_KEY_ID = "key"
+    process.env.B2_APPLICATION_KEY = "secret"
+    process.env.B2_ENDPOINT = "https://backblazeb2.com/us-west-004"
+    process.env.B2_BUCKET = "bucket"
+    expect(() => getStorage()).toThrow(/B2_ENDPOINT/)
+  })
+
+  it("builds the B2 driver when every variable is present", async () => {
+    process.env.STORAGE_DRIVER = "b2"
+    process.env.B2_KEY_ID = "key"
+    process.env.B2_APPLICATION_KEY = "secret"
+    process.env.B2_ENDPOINT = "https://s3.us-west-004.backblazeb2.com"
+    process.env.B2_BUCKET = "bucket"
+
+    const signed = await getStorage().url("resumes/u/a.pdf")
+    expect(signed).toContain("s3.us-west-004.backblazeb2.com")
+    expect(signed).toContain("X-Amz-Signature")
+  })
+
+  it("refuses to sign a traversing key on B2 too", async () => {
+    process.env.STORAGE_DRIVER = "b2"
+    process.env.B2_KEY_ID = "key"
+    process.env.B2_APPLICATION_KEY = "secret"
+    process.env.B2_ENDPOINT = "https://s3.us-west-004.backblazeb2.com"
+    process.env.B2_BUCKET = "bucket"
+
+    await expect(getStorage().url("../../etc/passwd")).rejects.toThrow()
+  })
 })

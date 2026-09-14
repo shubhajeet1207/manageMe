@@ -8,12 +8,15 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { assertSafeStorageKey, type StorageDriver } from "./storage"
 
 /**
- * Cloudflare R2, which speaks S3. Written for Vercel, where the local driver
- * cannot work at all: a serverless filesystem is ephemeral and per-invocation,
- * so `.uploads` would vanish between the write and the read.
+ * One driver for every S3-compatible provider this app supports. The
+ * provider-specific parts — which env vars, how the endpoint is built, which
+ * region the SDK is told to sign with — live in `index.ts`, one function per
+ * provider; this file only ever sees a fully-resolved config and does not
+ * know or care which provider it is talking to.
  *
- * R2 rather than S3 for the egress bill, and rather than Vercel Blob so the
- * bytes are not tied to the host we happen to deploy on today.
+ * Written for Vercel first, where the local driver cannot work at all: a
+ * serverless filesystem is ephemeral and per-invocation, so `.uploads` would
+ * vanish between the write and the read.
  */
 
 /** Signed URLs are short-lived: long enough to follow a redirect or finish an
@@ -22,48 +25,22 @@ import { assertSafeStorageKey, type StorageDriver } from "./storage"
 const DOWNLOAD_TTL_SECONDS = 300
 const UPLOAD_TTL_SECONDS = 600
 
-type R2Config = {
-  accountId: string
+export type S3DriverConfig = {
+  endpoint: string
+  /** Load-bearing for a genuinely regional provider (Backblaze B2): the SDK
+   *  signs the request with this and a mismatch against the endpoint's own
+   *  region fails auth. R2 is single-region by design and ignores the value,
+   *  but the SDK still refuses to sign with none supplied. */
+  region: string
   accessKeyId: string
   secretAccessKey: string
   bucket: string
 }
 
-/**
- * Read config from the environment, naming the exact variable that is missing.
- * This throws at driver construction rather than at first upload: a deploy with
- * a typo in one variable should fail where someone is watching, not three days
- * later when a user tries to attach a resume.
- */
-function readConfig(): R2Config {
-  const required = {
-    accountId: "R2_ACCOUNT_ID",
-    accessKeyId: "R2_ACCESS_KEY_ID",
-    secretAccessKey: "R2_SECRET_ACCESS_KEY",
-    bucket: "R2_BUCKET",
-  } as const
-
-  const missing = Object.values(required).filter((name) => !process.env[name])
-  if (missing.length > 0) {
-    throw new Error(
-      `STORAGE_DRIVER is "r2" but ${missing.join(", ")} ${missing.length === 1 ? "is" : "are"} not set.`
-    )
-  }
-
-  return {
-    accountId: process.env[required.accountId]!,
-    accessKeyId: process.env[required.accessKeyId]!,
-    secretAccessKey: process.env[required.secretAccessKey]!,
-    bucket: process.env[required.bucket]!,
-  }
-}
-
-export function createR2StorageDriver(config: R2Config = readConfig()): StorageDriver {
+export function createS3StorageDriver(config: S3DriverConfig): StorageDriver {
   const client = new S3Client({
-    // R2 is single-region by design and ignores this, but the SDK refuses to
-    // sign without one.
-    region: "auto",
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    region: config.region,
+    endpoint: config.endpoint,
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: config.secretAccessKey,
@@ -133,7 +110,9 @@ export function createR2StorageDriver(config: R2Config = readConfig()): StorageD
   }
 }
 
-/** R2 answers a missing key with NoSuchKey, or a bare 404 on a HEAD-like path. */
+/** Every provider tested against answers a missing key with NoSuchKey, or a
+ *  bare 404 on a HEAD-like path — this is what the S3 API itself specifies,
+ *  not a Cloudflare-specific behaviour. */
 function isNotFound(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false
   const e = error as { name?: string; $metadata?: { httpStatusCode?: number } }
