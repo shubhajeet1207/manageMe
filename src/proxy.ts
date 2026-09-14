@@ -8,6 +8,7 @@ const { auth } = NextAuth(authConfig)
 // happens to them. Updating one alone leaves a route half-protected, silently.
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/analytics",
   "/settings",
   "/applications",
   "/companies",
@@ -41,6 +42,7 @@ export const config = {
   // <object> or break an <img> (Phase 4 §11).
   matcher: [
     "/dashboard/:path*",
+    "/analytics/:path*",
     "/settings/:path*",
     "/applications/:path*",
     "/companies/:path*",

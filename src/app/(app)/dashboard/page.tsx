@@ -1,38 +1,69 @@
 import Link from "next/link"
 import { auth } from "@/lib/auth/auth"
 import { findById } from "@/server/repositories/user-repository"
-import { listApplications } from "@/server/services/application-service"
+import { getDashboardSummary } from "@/server/services/analytics-service"
+import type { DashboardSummary } from "@/server/services/analytics-service"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
-import { STATUS_ACCENT, STATUS_LABELS, STATUS_ORDER } from "@/components/status-badge"
+import { STATUS_ACCENT, STATUS_LABELS } from "@/components/status-badge"
+import { STATUS_ORDER } from "@/lib/status-order"
 import { cn } from "@/lib/utils"
 
+const NOTHING_TRACKED: DashboardSummary = {
+  tracked: 0,
+  inPlay: 0,
+  nowAtInterviewOrBetter: 0,
+  everReachedInterview: null,
+  movedThisWeek: null,
+  pipeline: STATUS_ORDER.map((status) => ({ status, count: 0 })),
+}
+
+type Tile = { label: string; value: number | null; note?: string }
+
+/**
+ * Current-state first. This is the page opened twenty times a day, so it
+ * answers "where does everything stand"; the retrospective belongs on
+ * /analytics, which is opened monthly (§9.2).
+ *
+ * The counts come from one `groupBy` in the analytics service rather than from
+ * `listApplications`, which used to fetch every row with its company joined in
+ * order to render ten integers through in-memory filters.
+ */
 export default async function DashboardPage() {
   const session = await auth()
-  const user = session?.user?.id ? await findById(session.user.id) : null
+  const userId = session?.user?.id
+  const user = userId ? await findById(userId) : null
   const name = user?.name ?? user?.email ?? "there"
-  const applications = session?.user?.id ? await listApplications(session.user.id) : []
+  const summary = userId ? await getDashboardSummary(userId) : NOTHING_TRACKED
 
-  const counts = STATUS_ORDER.map((status) => ({
-    status,
-    count: applications.filter((application) => application.status === status).length,
-  }))
-  const inPlay = applications.filter(
-    (application) => application.status !== "REJECTED" && application.status !== "ACCEPTED"
-  ).length
-  const late = applications.filter(
-    (application) =>
-      application.status === "INTERVIEW" ||
-      application.status === "OFFER" ||
-      application.status === "ACCEPTED"
-  ).length
-
-  const stats = [
-    { label: "Tracked", value: applications.length },
-    { label: "In play", value: inPlay },
-    { label: "Interview or better", value: late },
+  const tiles: Tile[] = [
+    { label: "Tracked", value: summary.tracked },
+    { label: "In play", value: summary.inPlay },
+    // "Now at", not "Interview or better": the old label read as a reached-stage
+    // count, which is a different and usually larger number. The tile below
+    // teaches the difference by sitting next to it.
+    { label: "Now at interview or better", value: summary.nowAtInterviewOrBetter },
   ]
+
+  // Appears only once there is history to count. Before that it would show the
+  // same number as the tile above it, which teaches the opposite of the point.
+  if (summary.everReachedInterview !== null) {
+    tiles.push({
+      label: "Ever reached interview",
+      value: summary.everReachedInterview,
+      note: "Counted from recorded moves.",
+    })
+  }
+
+  tiles.push({
+    label: "Moved this week",
+    value: summary.movedThisWeek,
+    note:
+      summary.movedThisWeek === null
+        ? "Nothing recorded yet — status changes start appearing here as you move cards."
+        : undefined,
+  })
 
   return (
     <div className="space-y-6">
@@ -45,7 +76,7 @@ export default async function DashboardPage() {
         </Button>
       </PageHeader>
 
-      {applications.length === 0 ? (
+      {summary.tracked === 0 ? (
         <EmptyState
           title="Nothing in the pipeline yet"
           description="Add an application and the funnel below will start filling in."
@@ -57,15 +88,24 @@ export default async function DashboardPage() {
       ) : (
         <>
           <dl className="grid max-w-3xl gap-3 sm:grid-cols-3">
-            {stats.map((stat) => (
+            {tiles.map((tile) => (
               <div
-                key={stat.label}
+                key={tile.label}
                 className="border-border bg-card rounded-lg border px-4 py-3"
               >
                 <dt className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
-                  {stat.label}
+                  {tile.label}
                 </dt>
-                <dd className="mt-1 text-2xl font-semibold tabular-nums">{stat.value}</dd>
+                {/* A dash, never a zero: before anything is recorded, a zero
+                    asserts that nothing happened when nothing was watching. */}
+                <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                  {tile.value ?? "—"}
+                </dd>
+                {tile.note && (
+                  <p className="text-muted-foreground mt-1 text-[11px] leading-relaxed">
+                    {tile.note}
+                  </p>
+                )}
               </div>
             ))}
           </dl>
@@ -74,11 +114,19 @@ export default async function DashboardPage() {
             aria-label="Pipeline"
             className="border-border bg-card space-y-4 rounded-lg border p-4"
           >
-            <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
-              Pipeline
-            </h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+                Pipeline
+              </h2>
+              <Link
+                href="/analytics"
+                className="text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
+              >
+                See the full picture →
+              </Link>
+            </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-4 lg:grid-cols-7">
-              {counts.map(({ status, count }) => (
+              {summary.pipeline.map(({ status, count }) => (
                 <div
                   key={status}
                   className={cn(

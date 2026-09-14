@@ -1,6 +1,7 @@
 import {
   Briefcase,
   Building2,
+  ChartColumn,
   CircleCheck,
   FileText,
   Files,
@@ -25,6 +26,7 @@ export interface NavItem {
 
 export const siteNav: NavItem[] = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Analytics", href: "/analytics", icon: ChartColumn },
   { title: "Applications", href: "/applications", icon: Briefcase, group: "Career" },
   { title: "Resumes", href: "/resumes", icon: FileText, group: "Career" },
   // `Files` rather than `Vault` or `FolderLock`: a padlock claims a
