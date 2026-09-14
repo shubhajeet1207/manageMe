@@ -6,6 +6,13 @@ import type {
   Company,
   StatusEventSource,
 } from "@prisma/client"
+import {
+  resolveApplicationSort,
+  type ApplicationSort,
+  type ApplicationSortInput,
+  type SortDirection,
+} from "@/lib/application-sort"
+import { STATUS_ORDER } from "@/lib/status-order"
 import type { CreateApplicationInput } from "@/server/validators/application-schemas"
 
 export type ApplicationWithCompany = Application & { company: Company }
@@ -180,23 +187,124 @@ async function commitStatusWrite<T extends { id: string; status: ApplicationStat
   }
 }
 
-export function listByUser(userId: string): Promise<ApplicationWithCompany[]> {
-  return prisma.application.findMany({
-    where: { userId },
+/**
+ * What the list functions ordered by before sorting was a parameter, and what
+ * they still order by when no sort is passed.
+ *
+ * `id` is appended as a final tiebreak on every sort: `updatedAt` has
+ * millisecond resolution and a seeded fixture writes several rows inside one
+ * millisecond, so without it two reloads of the same URL can return the same
+ * rows in a different order — a table that reshuffles under the cursor, and a
+ * test that passes on Tuesday.
+ */
+const DEFAULT_ORDER_BY: Prisma.ApplicationOrderByWithRelationInput[] = [
+  { updatedAt: "desc" },
+  { id: "asc" },
+]
+
+/**
+ * A `switch`, not a lookup table, so the compiler proves every allowlisted key
+ * has a clause; and the key reaching here has already been through
+ * `resolveApplicationSort`, so the user's string was compared against the
+ * allowlist before it ever helped build a query. Neither layer alone is
+ * enough: the allowlist is what keeps `?sort=toString` out, and the switch is
+ * what keeps a future key from silently falling through to the default.
+ */
+function orderByFor({
+  key,
+  direction,
+}: ApplicationSort): Prisma.ApplicationOrderByWithRelationInput[] {
+  switch (key) {
+    case "role":
+      return [{ roleTitle: direction }, ...DEFAULT_ORDER_BY]
+    case "company":
+      return [{ company: { name: direction } }, ...DEFAULT_ORDER_BY]
+    case "applied":
+      // `nulls: "last"` in BOTH directions. An application with no applied date
+      // has not been applied to; it is not the oldest one. Postgres defaults
+      // put NULLs first on DESC, which would open the "most recently applied"
+      // view on the rows that were never applied to at all.
+      return [{ appliedAt: { sort: direction, nulls: "last" } }, ...DEFAULT_ORDER_BY]
+    case "status":
+      // Sorted after the fact — see `sortByPipelineOrder`. The rows still come
+      // back in the default order so that pipeline ties have a stable
+      // tiebreak, which is the whole reason the reorder below can be stable.
+      return DEFAULT_ORDER_BY
+    case "updated":
+      return direction === "desc" ? DEFAULT_ORDER_BY : [{ updatedAt: "asc" }, { id: "asc" }]
+  }
+}
+
+/** A status missing from `STATUS_ORDER` sorts as if it sat one past the last
+ *  stage, rather than one before the first — which is where a raw `indexOf` of
+ *  -1 would put a status added to the enum but not to the array. */
+function pipelineRank(status: ApplicationStatus): number {
+  const index = STATUS_ORDER.indexOf(status)
+  return index === -1 ? STATUS_ORDER.length : index
+}
+
+/**
+ * Status is the one column the database cannot order for us.
+ *
+ * It looks like it can: Postgres sorts an enum by each value's declared
+ * position in the type, and today that declaration happens to match
+ * `STATUS_ORDER`. But `ALTER TYPE ... ADD VALUE` appends, so the first status
+ * added mid-funnel would sort last in the database while `STATUS_ORDER` puts
+ * it in the middle — and the table would quietly disagree with the board, the
+ * badges and §9.3's skip detection, all of which read the array. The array is
+ * the source of truth, so the rank comes from the array.
+ *
+ * Doing it in memory is safe because these lists are unpaginated by
+ * construction: both callers already read the user's entire set of
+ * applications to render a board or a table.
+ *
+ * `Array.prototype.sort` is required to be stable, so rows sharing a status
+ * keep the ORDER BY's `updatedAt desc, id asc`.
+ */
+function sortByPipelineOrder(
+  rows: ApplicationWithCompany[],
+  direction: SortDirection
+): ApplicationWithCompany[] {
+  const sign = direction === "asc" ? 1 : -1
+  return [...rows].sort((a, b) => sign * (pipelineRank(a.status) - pipelineRank(b.status)))
+}
+
+/**
+ * The one place the list queries are actually built.
+ *
+ * `userId` is spread LAST into the `where` so no scope a caller passes can
+ * overwrite it — the ownership filter is not something a future caller gets to
+ * opt out of by accident.
+ */
+async function listSorted(
+  userId: string,
+  scope: Prisma.ApplicationWhereInput,
+  sortInput: ApplicationSortInput | undefined
+): Promise<ApplicationWithCompany[]> {
+  const sort = resolveApplicationSort(sortInput)
+  const rows = await prisma.application.findMany({
+    where: { ...scope, userId },
     include: { company: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: orderByFor(sort),
   })
+  // The reorder runs on rows the query already scoped to `userId`, so it can
+  // move rows around but cannot introduce one.
+  return sort.key === "status" ? sortByPipelineOrder(rows, sort.direction) : rows
+}
+
+export function listByUser(
+  userId: string,
+  sort?: ApplicationSortInput
+): Promise<ApplicationWithCompany[]> {
+  return listSorted(userId, {}, sort)
 }
 
 export function listByCompany(
   userId: string,
-  companyId: string
+  companyId: string,
+  sort?: ApplicationSortInput
 ): Promise<ApplicationWithCompany[]> {
-  return prisma.application.findMany({
-    where: { userId, companyId },
-    include: { company: true },
-    orderBy: { updatedAt: "desc" },
-  })
+  return listSorted(userId, { companyId }, sort)
 }
 
 export function findById(userId: string, id: string): Promise<ApplicationWithCompany | null> {

@@ -11,25 +11,38 @@ describe("signupSchema", () => {
     const result = signupSchema.safeParse({
       name: "Ada Lovelace",
       email: "ada@example.com",
-      password: "Password123",
+      password: "Password12345",
     })
     expect(result.success).toBe(true)
   })
 
-  it("rejects a password without a digit", () => {
+  /** Inverted deliberately when the policy moved to length-over-complexity: a
+   *  digit requirement is what produced "password1", which the old rule
+   *  accepted. A 12-character passphrase with no digit is now the better
+   *  password and must pass. */
+  it("accepts a long passphrase with no digit", () => {
     const result = signupSchema.safeParse({
       name: "Ada Lovelace",
       email: "ada@example.com",
-      password: "Passwordonly",
+      password: "correcthorsebattery",
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects the old policy's canonical weak password", () => {
+    const result = signupSchema.safeParse({
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      password: "password1",
     })
     expect(result.success).toBe(false)
   })
 
-  it("rejects a password shorter than 8 characters", () => {
+  it("rejects a password shorter than 12 characters", () => {
     const result = signupSchema.safeParse({
       name: "Ada Lovelace",
       email: "ada@example.com",
-      password: "Pw1",
+      password: "Password1",
     })
     expect(result.success).toBe(false)
   })
@@ -38,7 +51,7 @@ describe("signupSchema", () => {
     const result = signupSchema.safeParse({
       name: "Ada Lovelace",
       email: "not-an-email",
-      password: "Password123",
+      password: "Password12345",
     })
     expect(result.success).toBe(false)
   })

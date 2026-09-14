@@ -24,9 +24,9 @@ export function ResumeTable({ resumes }: { resumes: ResumeLibraryItem[] }) {
     // The same single-scroller frame as /companies: the inner container's
     // overflow is neutralised so the bordered frame is the one thing that
     // scrolls, and below lg the table keeps a readable strip rather than
-    // crushing seven columns into a phone.
+    // crushing nine columns into a phone.
     <div className="border-card-border bg-card scroll-rail overflow-x-auto rounded-lg border [&_[data-slot=table-container]]:overflow-x-visible">
-      <Table className="min-w-[1000px] lg:min-w-[860px]">
+      <Table className="min-w-[1240px] lg:min-w-[1100px]">
         <TableHeader className="bg-well/70">
           <TableRow className="hover:bg-transparent [&>th]:text-muted-foreground [&>th]:h-9 [&>th]:px-3 [&>th]:text-[11px] [&>th]:font-medium [&>th]:tracking-[0.07em] [&>th]:uppercase">
             <TableHead>Name</TableHead>
@@ -34,6 +34,14 @@ export function ResumeTable({ resumes }: { resumes: ResumeLibraryItem[] }) {
             <TableHead>Current version</TableHead>
             <TableHead className="text-right">Versions</TableHead>
             <TableHead className="text-right">Used by</TableHead>
+            {/* The A/B this table exists for, and the two labels are the
+                dashboard's word for word. "Ever reached" is the column that
+                answers "did this resume get interviews": a resume whose
+                applications all interviewed and were then rejected reads 0
+                under "Now at" and still won. A single column called
+                "Interviews" would collapse the two into one wrong number. */}
+            <TableHead className="w-28 text-right">Now at interview or better</TableHead>
+            <TableHead className="w-28 text-right">Ever reached interview</TableHead>
             <TableHead className="xl:w-28">Updated</TableHead>
             <TableHead className="w-36 text-right">Actions</TableHead>
           </TableRow>
@@ -80,6 +88,20 @@ export function ResumeTable({ resumes }: { resumes: ResumeLibraryItem[] }) {
               <TableCell className="text-right tabular-nums">{resume._count.versions}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {resume.stats.applications}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {resume.stats.atInterviewOrBeyond}
+              </TableCell>
+              {/* A dash, never a zero. With nothing recorded against this
+                  resume a 0 would assert that none of its applications ever
+                  reached interview, when in fact nothing was watching — the
+                  same rule the companies table and the dashboard tile follow. */}
+              <TableCell className="text-right tabular-nums">
+                {resume.stats.recordedApplications === 0 ? (
+                  <span className="text-muted-foreground">&mdash;</span>
+                ) : (
+                  resume.stats.everReachedInterview
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground tabular-nums">
                 {formatDate(resume.updatedAt)}

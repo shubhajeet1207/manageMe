@@ -99,13 +99,6 @@ export type UploadResumeVersionData = {
   bytes: Uint8Array
 }
 
-const EMPTY_STATS: ResumeStats = {
-  applications: 0,
-  atInterviewOrBeyond: 0,
-  offers: 0,
-  rejected: 0,
-}
-
 /**
  * The twin of `assertCompanyOwned` in application-service.ts, and it exists
  * for the identical reason: repository scoping cannot catch this. A write to
@@ -130,7 +123,7 @@ export async function listResumes(userId: string): Promise<ResumeLibraryItem[]> 
     resumeRepository.listByUser(userId),
     resumeRepository.statsByResume(userId),
   ])
-  return resumes.map((resume) => ({ ...resume, stats: stats.get(resume.id) ?? { ...EMPTY_STATS } }))
+  return resumes.map((resume) => ({ ...resume, stats: stats.get(resume.id) ?? resumeRepository.emptyResumeStats() }))
 }
 
 export function countUnlinkedApplications(userId: string): Promise<number> {
@@ -156,7 +149,7 @@ export async function getResumeDetail(userId: string, id: string): Promise<Resum
     resumeRepository.listApplicationsForResume(userId, id),
     resumeRepository.statsByResume(userId),
   ])
-  return { resume, versions, projects, applications, stats: stats.get(id) ?? { ...EMPTY_STATS } }
+  return { resume, versions, projects, applications, stats: stats.get(id) ?? resumeRepository.emptyResumeStats() }
 }
 
 export async function createResume(userId: string, input: CreateResumeInput): Promise<Resume> {

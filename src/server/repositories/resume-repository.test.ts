@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto"
 import { afterEach, describe, expect, it } from "vitest"
+import type { ApplicationStatus, StatusEventSource } from "@prisma/client"
 import { prisma } from "@/lib/db/prisma"
 import * as resumeRepository from "./resume-repository"
 
@@ -44,10 +45,64 @@ async function makeCompany(userId: string) {
   return prisma.company.create({ data: { userId, name: `Acme ${randomUUID().slice(0, 8)}` } })
 }
 
+/** A slot with one version, plus somewhere to apply. */
+async function makeUserReadyToApply(name = "Backend SWE") {
+  const base = await makeUserWithResume(name)
+  return { ...base, company: await makeCompany(base.user.id) }
+}
+
+/**
+ * Recorded status history for one application, written straight to the table.
+ *
+ * The production writer is `commitStatusWrite`, and it is exercised in
+ * application-repository.test.ts. These fixtures go around it deliberately:
+ * what is under test here is a backward drag, a skipped stage and a synthetic
+ * `BACKFILL` row, and the last of those has no write path in the codebase at
+ * all — it only ever came out of the migration.
+ *
+ * The chain is still written coherently — `fromStatus` is the previous
+ * `toStatus`, null only on the first row — so these fixtures cannot trip the
+ * §7.5 continuity check another repository asserts is clean.
+ */
+async function recordMoves(
+  userId: string,
+  applicationId: string,
+  moves: ApplicationStatus[],
+  source: StatusEventSource = "BOARD_DRAG"
+) {
+  let previous: ApplicationStatus | null = null
+  const rows = moves.map((toStatus) => {
+    const row = { userId, applicationId, fromStatus: previous, toStatus, source }
+    previous = toStatus
+    return row
+  })
+  await prisma.applicationStatusEvent.createMany({ data: rows })
+}
+
+/** Applications here are created at the status their recorded moves end on, so
+ *  the current-state half and the recorded half disagree only where a test
+ *  means them to. */
+async function makeApplication(
+  userId: string,
+  companyId: string,
+  roleTitle: string,
+  status: ApplicationStatus,
+  resumeVersionId: string | null
+) {
+  return prisma.application.create({
+    data: { userId, companyId, roleTitle, status, resumeVersionId },
+  })
+}
+
 afterEach(async () => {
   if (createdUserIds.length === 0) return
   const ids = [...createdUserIds]
   createdUserIds.length = 0
+  // Events cascade with their application, but an ownership test deliberately
+  // writes one user's event row against another user's application, and that
+  // row outlives the cascade when its application belongs to a user this sweep
+  // does not delete. Clearing by the event's own userId covers both.
+  await prisma.applicationStatusEvent.deleteMany({ where: { userId: { in: ids } } })
   // Applications Restrict on resumeVersion, so they go before the versions
   // they point at — including an application of another user that a test
   // deliberately pointed at these versions.
@@ -180,7 +235,7 @@ describe("resume versions", () => {
 })
 
 describe("resume analytics", () => {
-  it("folds applications to resume level in one grouped query", async () => {
+  it("folds every version of a slot into one set of current-state numbers", async () => {
     const { user, resume, version } = await makeUserWithResume()
     const company = await makeCompany(user.id)
     const second = await resumeRepository.createVersionAndSetCurrent(
@@ -205,7 +260,156 @@ describe("resume analytics", () => {
       atInterviewOrBeyond: 3,
       offers: 2,
       rejected: 1,
+      // Nothing was ever dragged, so there is no recorded history to read.
+      // `recordedApplications` of 0 is the flag that makes the two zeroes above
+      // it suppressible rather than a claim that nothing reached interview.
+      everReachedInterview: 0,
+      everReachedOffer: 0,
+      recordedApplications: 0,
     })
+  })
+
+  it("credits the resume with an interview the application later lost", async () => {
+    // The payoff, and the number the current-state half cannot produce. This
+    // application is REJECTED now, so `atInterviewOrBeyond` is 0 — but the
+    // resume did get it an interview, and that is what the resume page is
+    // being asked. Against the old implementation every recorded field here
+    // was absent; against a rewrite that reads `Application.status` instead of
+    // the event log, `everReachedInterview` comes back 0.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "REJECTED", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "SCREENING", "INTERVIEW", "REJECTED"])
+
+    expect(await resumeRepository.statsByResume(user.id)).toEqual(
+      new Map([
+        [
+          resume.id,
+          {
+            applications: 1,
+            atInterviewOrBeyond: 0,
+            offers: 0,
+            rejected: 1,
+            everReachedInterview: 1,
+            everReachedOffer: 0,
+            recordedApplications: 1,
+          },
+        ],
+      ])
+    )
+  })
+
+  it("credits an offer the application did not end up holding", async () => {
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "REJECTED", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "INTERVIEW", "OFFER", "REJECTED"])
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    // `offers` is where it sits (nowhere); `everReachedOffer` is what it did.
+    expect(stats.get(resume.id)?.offers).toBe(0)
+    expect(stats.get(resume.id)?.everReachedOffer).toBe(1)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(1)
+  })
+
+  it("counts an application once per stage however often it moves back", async () => {
+    // Interview → Screening → Interview is two INTERVIEW rows and one
+    // interview. A `groupBy` over the events — the query this deliberately
+    // does not use — reports two, and two interviews out of one application is
+    // a rate above 100% the moment anything divides by it.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "INTERVIEW", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "INTERVIEW", "SCREENING", "INTERVIEW"])
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(1)
+    expect(stats.get(resume.id)?.recordedApplications).toBe(1)
+  })
+
+  it("counts one application once even though it reached two stages", async () => {
+    // Reaching INTERVIEW and then OFFER leaves two distinct rows, and both are
+    // "interview or beyond". Incrementing per row rather than per application
+    // reports two interviews from one application.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "OFFER", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "INTERVIEW", "OFFER"])
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(1)
+    expect(stats.get(resume.id)?.everReachedOffer).toBe(1)
+    expect(stats.get(resume.id)?.recordedApplications).toBe(1)
+  })
+
+  it("reads a jump straight past interview as having reached it", async () => {
+    // SCREENING → OFFER writes no INTERVIEW row at all. Matching a literal
+    // `toStatus === "INTERVIEW"` would report 0 ever reached interview beside a
+    // current-state 1, making the recorded half SMALLER than the half it is
+    // supposed to correct upwards.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "OFFER", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "SCREENING", "OFFER"])
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    expect(stats.get(resume.id)?.atInterviewOrBeyond).toBe(1)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(1)
+  })
+
+  it("does not read a REJECTED event as having reached offer", async () => {
+    // REJECTED sits LAST in STATUS_ORDER, so a threshold built by index over
+    // that array would file every rejection under "offer or beyond" — the
+    // reason the sets are built from PIPELINE_STAGES instead.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "REJECTED", version.id)
+    await recordMoves(user.id, application.id, ["APPLIED", "REJECTED"])
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(0)
+    expect(stats.get(resume.id)?.everReachedOffer).toBe(0)
+    // It still has real history, so the zeroes above are answers rather than
+    // an absence of one.
+    expect(stats.get(resume.id)?.recordedApplications).toBe(1)
+  })
+
+  it("does not read synthetic BACKFILL history as a stage the resume reached", async () => {
+    // A BACKFILL row was written by the migration FROM the application's
+    // current status; it is not evidence of a move. Counting it would hand
+    // every resume that predates recording a free interview on the day this
+    // shipped — and `recordedApplications` would vouch for the figure.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const application = await makeApplication(user.id, company.id, "A", "INTERVIEW", version.id)
+    await recordMoves(user.id, application.id, ["INTERVIEW"], "BACKFILL")
+
+    expect(await resumeRepository.statsByResume(user.id)).toEqual(
+      new Map([
+        [
+          resume.id,
+          {
+            applications: 1,
+            atInterviewOrBeyond: 1,
+            offers: 0,
+            rejected: 0,
+            everReachedInterview: 0,
+            everReachedOffer: 0,
+            recordedApplications: 0,
+          },
+        ],
+      ])
+    )
+  })
+
+  it("counts only applications with real history towards the recorded denominator", async () => {
+    // The two halves divide by different numbers on purpose: an application
+    // nothing was watching can never appear in a reached figure, so dividing a
+    // reached count by `applications` understates the resume by exactly the
+    // coverage gap.
+    const { user, resume, version, company } = await makeUserReadyToApply()
+    const watched = await makeApplication(user.id, company.id, "A", "INTERVIEW", version.id)
+    await recordMoves(user.id, watched.id, ["APPLIED", "INTERVIEW"])
+    await makeApplication(user.id, company.id, "B", "INTERVIEW", version.id)
+
+    const stats = await resumeRepository.statsByResume(user.id)
+    expect(stats.get(resume.id)?.applications).toBe(2)
+    expect(stats.get(resume.id)?.atInterviewOrBeyond).toBe(2)
+    expect(stats.get(resume.id)?.everReachedInterview).toBe(1)
+    expect(stats.get(resume.id)?.recordedApplications).toBe(1)
   })
 
   it("counts applications that have no resume linked", async () => {
@@ -369,6 +573,82 @@ describe("ownership", () => {
 
     expect(await resumeRepository.statsByResume(other.user.id)).toEqual(new Map())
     expect(await resumeRepository.countApplicationsForResume(owner.user.id, owner.resume.id)).toBe(0)
+  })
+
+  it("keeps another user's recorded history out of a resume's numbers", async () => {
+    // The same cross-entity hole as the test above, now with history attached:
+    // the recorded half joins events to applications by id, which is a second
+    // path by which another user's row could land on this resume.
+    const owner = await makeUserReadyToApply()
+    const other = await makeUserReadyToApply("Data roles")
+
+    const mine = await makeApplication(
+      owner.user.id,
+      owner.company.id,
+      "Mine",
+      "REJECTED",
+      owner.version.id
+    )
+    await recordMoves(owner.user.id, mine.id, ["APPLIED", "INTERVIEW", "REJECTED"])
+
+    // Written directly, bypassing the service guard: another user's
+    // application, pointed at the owner's version, with its own history.
+    const theirs = await makeApplication(
+      other.user.id,
+      other.company.id,
+      "Theirs",
+      "OFFER",
+      owner.version.id
+    )
+    await recordMoves(other.user.id, theirs.id, ["APPLIED", "INTERVIEW", "OFFER"])
+
+    // The version is not theirs, so it maps to no resume of theirs and its
+    // history is dropped with it rather than landing on a resume at random.
+    expect(await resumeRepository.statsByResume(other.user.id)).toEqual(new Map())
+
+    // And the owner is credited with their own interview and nothing else. An
+    // `everReachedOffer` of 1 here is the other user's application folded into
+    // the owner's resume — a plausible-looking number, which is exactly what
+    // makes a dropped scope on an aggregate worse than one on a row read.
+    expect(await resumeRepository.statsByResume(owner.user.id)).toEqual(
+      new Map([
+        [
+          owner.resume.id,
+          {
+            applications: 1,
+            atInterviewOrBeyond: 0,
+            offers: 0,
+            rejected: 1,
+            everReachedInterview: 1,
+            everReachedOffer: 0,
+            recordedApplications: 1,
+          },
+        ],
+      ])
+    )
+  })
+
+  it("scopes the recorded half by the event's own userId, not by its application", async () => {
+    // `ApplicationStatusEvent.userId` is denormalised precisely so this filter
+    // can be top-level. Reaching the scope through the relation instead —
+    // `where: { application: { userId } }` — would count the row below, and
+    // the two assertions differ only in that case.
+    const owner = await makeUserReadyToApply()
+    const other = await makeUser()
+    const application = await makeApplication(
+      owner.user.id,
+      owner.company.id,
+      "A",
+      "REJECTED",
+      owner.version.id
+    )
+    await recordMoves(other.id, application.id, ["APPLIED", "INTERVIEW", "REJECTED"])
+
+    const stats = await resumeRepository.statsByResume(owner.user.id)
+    expect(stats.get(owner.resume.id)?.everReachedInterview).toBe(0)
+    expect(stats.get(owner.resume.id)?.recordedApplications).toBe(0)
+    // Nor does the event's id hand the application to the user it names.
+    expect(await resumeRepository.statsByResume(other.id)).toEqual(new Map())
   })
 })
 

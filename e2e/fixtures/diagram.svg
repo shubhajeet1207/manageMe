@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  A scripted document format. If the vault ever accepts this, an SVG served
+  from our own origin runs its script with our origin's session — which is
+  exactly why SVG is absent from the content-type registry.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#2f6dc7" />
+  <script>document.title = "if this ever executes, SVG got into the registry"</script>
+</svg>

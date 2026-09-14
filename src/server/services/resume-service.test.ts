@@ -370,11 +370,19 @@ describe("listResumes", () => {
     })
 
     const listed = (await listResumes(user.id)).find((r) => r.id === resume.id)
+    // The three recorded figures are 0 because this fixture inserts with
+    // `createMany`, which bypasses the chokepoint and so records no status
+    // events (§7.6). That is the point of keeping them in this assertion: an
+    // application can sit AT interview while having never been RECORDED
+    // reaching it, and the two numbers must not be conflated.
     expect(listed?.stats).toEqual({
       applications: 2,
       atInterviewOrBeyond: 1,
       offers: 0,
       rejected: 1,
+      everReachedInterview: 0,
+      everReachedOffer: 0,
+      recordedApplications: 0,
     })
     expect(listed?._count.versions).toBe(1)
   })

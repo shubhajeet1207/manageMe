@@ -1,5 +1,13 @@
 import { prisma } from "@/lib/db/prisma"
-import type { Application, Company, Resume, ResumeProject, ResumeVersion } from "@prisma/client"
+import type {
+  Application,
+  ApplicationStatus,
+  Company,
+  Resume,
+  ResumeProject,
+  ResumeVersion,
+} from "@prisma/client"
+import { PIPELINE_STAGES, stageIndex } from "@/lib/status-order"
 import type { CreateResumeInput } from "@/server/validators/resume-schemas"
 
 /**
@@ -31,12 +39,91 @@ export type NewVersionData = {
   sizeBytes: number
 }
 
+/**
+ * Two classes of figure about one resume, and the whole point of the type is
+ * that they are not the same number.
+ *
+ * The `atInterviewOrBeyond` / `offers` / `rejected` trio is CURRENT STATE:
+ * where the applications stand right now. The `everReached*` pair is RECORDED
+ * HISTORY: what they did on the way, read back out of ApplicationStatusEvent.
+ * An application that interviewed and was then rejected is in `rejected` and
+ * in `everReachedInterview`, and that gap is the reason this resume page
+ * exists — it is the only place in the product where "the resume did its job"
+ * and "the application did not work out" are visibly different claims.
+ *
+ * The field names carry the class, because a caller reading a bare number
+ * cannot label it correctly: `atInterviewOrBeyond` renders as "Now at ...",
+ * `everReachedInterview` as "Ever reached ..." — the same two words the
+ * dashboard uses for the same two quantities.
+ */
 export type ResumeStats = {
+  /** Applications that record a version of this resume. The denominator for
+   *  the three current-state figures. */
   applications: number
+  /** Current state. NOT a reached-stage count — see the comment above. */
   atInterviewOrBeyond: number
+  /** Current state: sitting at OFFER or ACCEPTED right now. */
   offers: number
+  /** Current state. */
   rejected: number
+  /** Recorded: DISTINCT applications with a real move to interview or beyond,
+   *  however they stand now. */
+  everReachedInterview: number
+  /** Recorded: DISTINCT applications with a real move to offer or beyond. */
+  everReachedOffer: number
+  /**
+   * The denominator for the two above, and never `applications`: an
+   * application whose only history is synthetic, or which predates recording
+   * entirely, can never appear in a reached figure, so dividing by every
+   * application would understate the resume by exactly the coverage gap.
+   *
+   * It is also the decision the UI needs: at 0 the `everReached*` pair must be
+   * suppressed, not rendered as "0 ever reached interview". Before anything
+   * was written down the honest answer is that nothing was watching, and a 0
+   * asserts that nothing happened — the same rule as the dashboard's nullable
+   * `everReachedInterview`, stated once here rather than by making both
+   * recorded fields nullable.
+   */
+  recordedApplications: number
 }
+
+/** The zero row. Exported so every caller that needs a "no applications yet"
+ *  placeholder gets the current field set rather than its own literal, which
+ *  is how a stats object ends up missing a field added later. */
+export function emptyResumeStats(): ResumeStats {
+  return {
+    applications: 0,
+    atInterviewOrBeyond: 0,
+    offers: 0,
+    rejected: 0,
+    everReachedInterview: 0,
+    everReachedOffer: 0,
+    recordedApplications: 0,
+  }
+}
+
+/**
+ * The stages that count as "at/reached X or beyond", as a set per threshold.
+ *
+ * Built from PIPELINE_STAGES, never from STATUS_ORDER: REJECTED sits LAST in
+ * STATUS_ORDER, so a plain `stageIndex(s) >= start` over that array would file
+ * every rejection under "offer or beyond" and report an offer rate above 100%.
+ * It is where applications land, not a stage they pass through.
+ *
+ * One definition feeds both halves of ResumeStats on purpose. "Now at
+ * interview or beyond" counts three statuses; if "ever reached interview"
+ * counted only literal INTERVIEW events, an application that jumped straight
+ * to OFFER would make the recorded number SMALLER than the current-state one,
+ * and the pair the page is built to compare would be comparing two different
+ * questions.
+ */
+function stagesAtOrBeyond(from: ApplicationStatus): Set<ApplicationStatus> {
+  const start = stageIndex(from)
+  return new Set(PIPELINE_STAGES.filter((stage) => stageIndex(stage) >= start))
+}
+
+const INTERVIEW_OR_BEYOND = stagesAtOrBeyond("INTERVIEW")
+const OFFER_OR_BEYOND = stagesAtOrBeyond("OFFER")
 
 /** Thrown inside the create-version transaction to roll it back. Never leaves
  *  this module: `createVersionAndSetCurrent` maps it to `null`. */
@@ -207,49 +294,94 @@ export function countUnlinkedApplications(userId: string): Promise<number> {
 }
 
 /**
- * §9 — derived entirely from the existing pipeline, in ONE grouped query
- * folded to resume level in memory. No new tracking tables.
+ * §9 / §9.8 — the two classes of figure about one resume, side by side,
+ * derived entirely from the existing pipeline. No new tracking tables.
  *
- * "At interview or beyond" is a CURRENT state, not a history: an application
- * that interviewed and was then rejected counts only in `rejected`. The UI
- * must label it as such rather than claiming a reached-stage rate.
+ * "At interview or beyond" is a CURRENT state: an application that interviewed
+ * and was then rejected counts only in `rejected`. That undercount was the
+ * whole of Phase 3's honesty caveat, and it is what the recorded half fixes —
+ * `everReachedInterview` reads ApplicationStatusEvent and counts that
+ * application, because the resume did get it an interview. The UI must keep
+ * labelling the first "Now at" and the second "Ever reached"; they are
+ * different claims and the gap between them is the point.
+ *
+ * Three queries, each with `userId` as a TOP-LEVEL filter. These are
+ * aggregates, where a dropped scope is a plausible-looking wrong number rather
+ * than a visible leak, so no relation clause carries the ownership check.
+ *
+ * The applications are fetched as rows rather than folded by a `groupBy`,
+ * which is a deliberate reversal of the pattern elsewhere: the recorded half
+ * has to join events to applications by id, so the id list is needed anyway
+ * and a `groupBy` beside it would be a second round trip to Oregon computing
+ * something already in memory.
  */
 export async function statsByResume(userId: string): Promise<Map<string, ResumeStats>> {
-  const [versions, groups] = await Promise.all([
+  const [versions, linked, reached] = await Promise.all([
     prisma.resumeVersion.findMany({ where: { userId }, select: { id: true, resumeId: true } }),
-    prisma.application.groupBy({
-      by: ["resumeVersionId", "status"],
+    prisma.application.findMany({
       where: { userId, resumeVersionId: { not: null } },
-      _count: { _all: true },
+      select: { id: true, status: true, resumeVersionId: true },
+    }),
+    // The shape analytics-repository.ts's `reachedCounts` fetches, for the
+    // same reason: a `groupBy` here would count EVENTS, and an application
+    // dragged Interview → Screening → Interview produced two of them while
+    // reaching interview once — two interviews out of one application, which
+    // is a rate above 100% as soon as anything divides by it.
+    //
+    // `distinct` on the pair collapses that repetition in Postgres rather than
+    // shipping one row per drag back from Oregon; the fold below is what
+    // makes the COUNT distinct, since the two are not the same guarantee —
+    // distinct rows still carry one application at INTERVIEW *and* at OFFER.
+    //
+    // BACKFILL rows are excluded here rather than by the caller. A synthetic
+    // row asserts only where an application stands now; reading it as evidence
+    // of having *reached* that stage would hand every pre-recording resume a
+    // free interview on the day this ships.
+    prisma.applicationStatusEvent.findMany({
+      where: { userId, source: { not: "BACKFILL" } },
+      select: { applicationId: true, toStatus: true },
+      distinct: ["applicationId", "toStatus"],
     }),
   ])
 
   const resumeIdByVersionId = new Map(versions.map((version) => [version.id, version.resumeId]))
+
+  // Folded per application before anything is counted: one application that
+  // reached INTERVIEW *and* OFFER has two distinct rows above, and both are
+  // "interview or beyond". Incrementing per row would count it twice and
+  // report more interviews than there are applications.
+  const reachedByApplicationId = new Map<string, ApplicationStatus[]>()
+  for (const event of reached) {
+    const stages = reachedByApplicationId.get(event.applicationId)
+    if (stages) stages.push(event.toStatus)
+    else reachedByApplicationId.set(event.applicationId, [event.toStatus])
+  }
+
   const stats = new Map<string, ResumeStats>()
 
-  for (const group of groups) {
-    if (!group.resumeVersionId) continue
-    const resumeId = resumeIdByVersionId.get(group.resumeVersionId)
+  for (const application of linked) {
+    if (!application.resumeVersionId) continue
+    const resumeId = resumeIdByVersionId.get(application.resumeVersionId)
     // A version id the user does not own: another user's file, linked before
-    // the service guard existed. It belongs to no resume of theirs.
+    // the service guard existed. It belongs to no resume of theirs — and
+    // because the recorded half is folded inside this same loop, its history
+    // is dropped with it rather than landing on a resume at random.
     if (!resumeId) continue
 
-    const entry = stats.get(resumeId) ?? {
-      applications: 0,
-      atInterviewOrBeyond: 0,
-      offers: 0,
-      rejected: 0,
-    }
-    const count = group._count._all
-
-    entry.applications += count
-    if (group.status === "INTERVIEW" || group.status === "OFFER" || group.status === "ACCEPTED") {
-      entry.atInterviewOrBeyond += count
-    }
-    if (group.status === "OFFER" || group.status === "ACCEPTED") entry.offers += count
-    if (group.status === "REJECTED") entry.rejected += count
-
+    const entry = stats.get(resumeId) ?? emptyResumeStats()
     stats.set(resumeId, entry)
+
+    entry.applications += 1
+    if (INTERVIEW_OR_BEYOND.has(application.status)) entry.atInterviewOrBeyond += 1
+    if (OFFER_OR_BEYOND.has(application.status)) entry.offers += 1
+    if (application.status === "REJECTED") entry.rejected += 1
+
+    const stages = reachedByApplicationId.get(application.id)
+    if (!stages) continue
+
+    entry.recordedApplications += 1
+    if (stages.some((stage) => INTERVIEW_OR_BEYOND.has(stage))) entry.everReachedInterview += 1
+    if (stages.some((stage) => OFFER_OR_BEYOND.has(stage))) entry.everReachedOffer += 1
   }
 
   return stats

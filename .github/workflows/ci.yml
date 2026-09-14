@@ -1,0 +1,217 @@
+name: CI
+
+# Pushes to main and every pull request, so the gates run on each commit rather
+# than once at the end of a phase. A Phase 2 defect survived six tasks because
+# lint was run once, by hand, at the end; that is the failure this file exists to
+# make impossible.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# One run per branch. A second push while the first run is still going makes that
+# run's verdict worthless — it describes code nobody will merge — so it is
+# cancelled rather than left to finish and compete for the runner. `head_ref` is
+# the PR's source branch and `ref` covers pushes to main, so a PR branch keeps
+# ONE group across both event types instead of racing itself.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Types, lint and tests
+    runs-on: ubuntu-latest
+    # The suite is minutes, not an hour. A job past this is wedged — most likely
+    # waiting on a database connection that will never be answered — and the
+    # default (six hours) would let it sit there burning runner time.
+    timeout-minutes: 20
+
+    # The integration tests write to whatever DATABASE_URL points at and clean up
+    # their own rows. Pointed at the shared Neon database, two runs of this
+    # workflow would delete each other's fixtures mid-assertion and fail in a
+    # different place each time — and a cancelled run (see `concurrency` above)
+    # would leave rows behind in a database a human also uses. A service
+    # container gives each job a private Postgres that dies with the job, so
+    # isolation is structural instead of a convention tests have to honour.
+    # Keep the major version in step with the Neon project this app runs on.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: manageme_test
+        ports:
+          - 5432:5432
+        # Without a health check the job races the database: steps start the
+        # moment the container is created, several seconds before Postgres is
+        # accepting connections, and `migrate deploy` fails on ECONNREFUSED.
+        options: >-
+          --health-cmd "pg_isready -U postgres -d manageme_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # Localhost because the service container's 5432 is published to the runner.
+      # No sslmode: the container serves plaintext on the loopback interface, and
+      # `verify-full` (correct for Neon) would refuse to connect here.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manageme_test
+      # Throwaway values for a database that is deleted minutes from now. They
+      # are literals rather than repository secrets on purpose: a secret is not
+      # available to a pull request from a fork, which would leave that PR unable
+      # to run the suite at all.
+      #
+      # These must satisfy validateEnv() in src/lib/env.ts, which
+      # src/lib/auth/auth.config.ts calls at MODULE scope — so a malformed value
+      # here fails at import, not at first use. Hence: AUTH_SECRET at least 32
+      # characters; CREDENTIALS_KEY exactly 32 bytes of base64 and not a copy of
+      # AUTH_SECRET. Setting CREDENTIALS_KEY also matches a developer's .env,
+      # which always carries one — leaving it unset would run the suite in a
+      # configuration nobody has ever run it in. The crypto tests that need it
+      # absent delete it themselves.
+      AUTH_SECRET: ci-throwaway-auth-secret-not-used-outside-this-job
+      CREDENTIALS_KEY: Y2ktb25seS1jcmVkZW50aWFscy1rZXktMzItYnl0ZXM=
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version:` input on purpose: the action reads `packageManager` from
+      # package.json, which keeps the pinned pnpm version in one place. Naming it
+      # here too creates a second place to update, and a mismatch between the two
+      # is a hard error. This step must come before setup-node, whose pnpm cache
+      # shells out to pnpm to find the store path.
+      - uses: pnpm/action-setup@v4
+
+      # 22 is the version this project is developed on. Pinning the major here
+      # rather than "latest" keeps CI from being the first place a Node release
+      # is tried out.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # --frozen-lockfile: install exactly the lockfile, and fail if package.json
+      # has drifted from it, rather than silently resolving newer versions and
+      # testing a dependency tree that exists nowhere else.
+      - run: pnpm install --frozen-lockfile
+
+      # Prisma Client is generated code, not vendored code: nothing under
+      # node_modules exports a typed `PrismaClient` until this runs, so both tsc
+      # and the tests would fail on a fresh checkout without it. `migrate deploy`
+      # does not generate it — that is `migrate dev`, which must never run here
+      # (it is interactive, it can reset the database, and it writes new
+      # migration files from a schema diff).
+      - name: Generate Prisma Client
+        run: pnpm exec prisma generate
+
+      - name: Apply migrations
+        run: pnpm exec prisma migrate deploy
+
+      # Next 16 generates `next-env.d.ts` and the typed-routes definitions during
+      # `next dev`/`next build`; both are gitignored and so absent on a fresh
+      # checkout, and tsconfig.json includes them. `next typegen` produces them
+      # without paying for a full build — the documented CI path.
+      - name: Generate Next types
+        run: pnpm exec next typegen
+
+      - name: Typecheck
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        run: pnpm lint
+
+      # `pnpm test` is `vitest run`. If the suite ever turns flaky again under
+      # runner-level write pressure, the lever is VITEST_MAX_WORKERS (see
+      # vitest.config.ts) — not a bigger retry budget in the repository.
+      - name: Test
+        run: pnpm test
+
+  e2e:
+    name: End-to-end
+    # Only after the cheap gates pass: Playwright downloads three browsers and
+    # runs a production build, which is minutes of runner time to spend proving
+    # what a type error already disproved.
+    needs: verify
+    runs-on: ubuntu-latest
+    # Generous, because this job pays for a production build, three browser
+    # downloads, and a suite that runs one worker at a time across three engines
+    # with ~6.5s auth flows. Still a ceiling: a webServer that never comes up
+    # would otherwise hang for hours rather than fail.
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: manageme_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d manageme_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manageme_e2e
+      # Same throwaway values, same reasons, and here they are load-bearing for
+      # the server itself: `next build` and `next start` both import the auth
+      # config, whose validateEnv() call refuses to boot on a missing or
+      # malformed key.
+      AUTH_SECRET: ci-throwaway-auth-secret-not-used-outside-this-job
+      CREDENTIALS_KEY: Y2ktb25seS1jcmVkZW50aWFscy1rZXktMzItYnl0ZXM=
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      # Without this the job is red before a single assertion runs. `next start`
+      # sets NODE_ENV=production, and auth.config.ts computes `trustHost` as "not
+      # production, OR an origin is pinned" — so a production server with no
+      # AUTH_URL/NEXTAUTH_URL makes @auth/core's assertConfig return
+      # UntrustedHost, and every auth request answers 500 ("There was a problem
+      # with the server configuration"). Signup, login and every session read in
+      # the suite go through that path. NEXT_PUBLIC_APP_URL cannot stand in:
+      # next-auth's `reqWithEnvURL` reads these two names and no others.
+      AUTH_URL: http://localhost:3000
+      # The specs upload PDFs through the local storage driver. Under the
+      # runner's working directory and thrown away with the runner, exactly as
+      # .env.example describes for a developer.
+      STORAGE_DRIVER: local
+      UPLOADS_DIR: .uploads
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec prisma generate
+      - run: pnpm exec prisma migrate deploy
+
+      # --with-deps installs the shared libraries the browsers need on a bare
+      # ubuntu image; without it WebKit in particular fails to launch.
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps
+
+      # playwright.config.ts builds and starts the production server itself when
+      # CI is set (which GitHub sets for every step), so there is no separate
+      # build step to keep in sync with it.
+      - name: Run Playwright tests
+        run: pnpm test:e2e
+
+      # `!cancelled()` rather than `failure()`: the report is also how a flaky
+      # pass — one that only went green on a retry — gets noticed.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

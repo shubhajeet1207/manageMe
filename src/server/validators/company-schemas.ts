@@ -1,15 +1,23 @@
 import { z } from "zod"
-import { requiredId } from "@/server/validators/limits"
+import { LONG_TEXT_MAX, requiredId } from "@/server/validators/limits"
 import { optionalHttpUrl } from "@/server/validators/url"
 
 // `.optional()` MUST be the outermost wrapper. Applying `.transform()` after
 // `.optional()` hides the optional marker from Zod's key inference, producing
 // `website: string | undefined` (a required key) instead of `website?: string`,
 // which breaks every caller that omits the field.
+//
+// The cap is LONG_TEXT_MAX and must stay identical to the identically-named
+// `optionalText` in application-schemas.ts. The two had drifted — 500 here
+// against 2000 there — so the same paragraph of notes saved against an
+// application and was refused against the company it was about. They are two
+// helpers only because each file predates limits.ts; the number is one
+// decision, so it is read from one constant rather than retyped. Do not
+// "helpfully" split them again.
 const optionalText = z
   .string()
   .trim()
-  .max(500)
+  .max(LONG_TEXT_MAX)
   .transform((value) => (value === "" ? undefined : value))
   .optional()
 

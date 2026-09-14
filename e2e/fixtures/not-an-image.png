@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Not a PNG</title>
+  </head>
+  <body>
+    <h1>This is HTML, not a PNG.</h1>
+    <p>
+      The extension says .png and the browser types the file from its extension,
+      so `file.type` is "image/png" and the client-side allow-list waves it
+      through. The first eight bytes are "&lt;!doctyp", not the PNG signature,
+      which is what the server's magic-byte check actually decides on.
+    </p>
+    <script>
+      document.title = "if this ever executes, something served it as HTML"
+    </script>
+  </body>
+</html>

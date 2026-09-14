@@ -23,6 +23,10 @@ import type { Company } from "@prisma/client"
 import type { ResumeVersionWithResume } from "@/server/repositories/resume-repository"
 import { ApplicationCard, ApplicationCardOverlay } from "./application-card"
 import { changeStatusAction } from "./actions"
+import {
+  boardAnnouncements,
+  boardScreenReaderInstructions,
+} from "./board-announcements"
 
 function Column({
   status,
@@ -190,6 +194,12 @@ export function ApplicationBoard({
           sides. */}
       <DndContext
         id="application-board"
+        // dnd-kit's default live-region text is a cuid and an enum. These
+        // name the application and the stage instead; see board-announcements.
+        accessibility={{
+          announcements: boardAnnouncements,
+          screenReaderInstructions: boardScreenReaderInstructions,
+        }}
         sensors={sensors}
         collisionDetection={closestCorners}
         onDragStart={onDragStart}

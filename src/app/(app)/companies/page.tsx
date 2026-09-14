@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { auth } from "@/lib/auth/auth"
 import { listCompanies } from "@/server/services/company-service"
+import { statsByCompany } from "@/server/repositories/company-repository"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
@@ -11,7 +12,11 @@ export default async function CompaniesPage() {
   const session = await auth()
   if (!session?.user?.id) redirect("/login")
 
-  const companies = await listCompanies(session.user.id)
+  // One grouped query for every company's figures, rather than one per row.
+  const [companies, stats] = await Promise.all([
+    listCompanies(session.user.id),
+    statsByCompany(session.user.id),
+  ])
 
   return (
     <div className="space-y-6">
@@ -30,7 +35,7 @@ export default async function CompaniesPage() {
           <CompanySheet trigger={<Button>Add your first company</Button>} />
         </EmptyState>
       ) : (
-        <CompanyTable companies={companies} />
+        <CompanyTable companies={companies} stats={stats} />
       )}
     </div>
   )

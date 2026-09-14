@@ -37,7 +37,17 @@ export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) 
   const sections = groupNav(siteNav)
 
   return (
-    <>
+    // The navigation landmark has to be minted here. SidebarContent is a plain
+    // <div> and it is shadcn-generated, so wrapping the nav content is the only
+    // way to get the landmark without editing a vendored file. Without it the
+    // sidebar is ten anonymous links: nothing in the landmarks rotor, and
+    // nothing for "skip to navigation" to find. The label distinguishes it from
+    // the topbar's breadcrumb <nav>.
+    //
+    // flex-col reproduces what these groups had as SidebarContent's own flex
+    // children (a gap-0 column), so interposing this element changes the
+    // rendered layout by nothing.
+    <nav aria-label="Main" className="flex flex-col">
       {sections.map((section, index) => (
         <SidebarGroup key={section.label ?? `ungrouped-${index}`} className="p-0">
           {section.label ? <SidebarGroupLabel>{section.label}</SidebarGroupLabel> : null}
@@ -66,6 +76,6 @@ export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) 
           </SidebarGroupContent>
         </SidebarGroup>
       ))}
-    </>
+    </nav>
   )
 }
