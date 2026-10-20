@@ -1,10 +1,11 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
   MAX_TRACKED_KEYS,
   UNKNOWN_CLIENT_IP,
   clientIpFromHeaders,
   consumeAll,
   createInProcessRateLimiter,
+  createRedisRateLimiter,
   emailKey,
   ipKey,
   loginRateLimiter,
@@ -198,6 +199,83 @@ describe("createInProcessRateLimiter", () => {
     expect(denied.allowed).toBe(false)
     expect(denied.allowed ? null : denied.retryAfterMs).toBeLessThanOrEqual(REFILL_MS)
   })
+})
+
+describe("createRedisRateLimiter", () => {
+  it("executes the atomic script without putting the raw subject in Redis", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input
+      void init
+      return new Response(JSON.stringify({ result: [1, 2, 0] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    })
+    const limiter = createRedisRateLimiter({
+      burst: 3,
+      refillIntervalMs: 1000,
+      namespace: "login",
+      url: "https://example.upstash.io",
+      token: "rest-token",
+      hashKey: "hash-key",
+      fetcher: fetcher as unknown as typeof fetch,
+    })
+
+    await expect(limiter.consume("person@example.com")).resolves.toEqual({
+      allowed: true,
+      remaining: 2,
+    })
+
+    expect(fetcher).toHaveBeenCalledOnce()
+    const [url, init] = fetcher.mock.calls[0]
+    expect(String(url)).toBe("https://example.upstash.io/")
+    expect(init?.headers).toMatchObject({ Authorization: "Bearer rest-token" })
+    const body = JSON.parse(String(init?.body)) as Array<string | number>
+    expect(body.slice(0, 3)).toEqual(["EVAL", expect.any(String), 1])
+    expect(body[3]).toMatch(/^manageme:rate:login:[a-f0-9]{64}$/)
+    expect(JSON.stringify(body)).not.toContain("person@example.com")
+  })
+
+  it("returns the server's retry delay for a denied request", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      void input
+      void init
+      return new Response(JSON.stringify({ result: [0, 0, 750] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      })
+    })
+    const limiter = createRedisRateLimiter({
+      burst: 1,
+      refillIntervalMs: 1000,
+      namespace: "signup",
+      url: "https://example.upstash.io",
+      token: "rest-token",
+      hashKey: "hash-key",
+      fetcher: fetcher as unknown as typeof fetch,
+    })
+
+    await expect(limiter.consume("subject")).resolves.toEqual({
+      allowed: false,
+      retryAfterMs: 750,
+    })
+  })
+
+  it.each(["http://example.upstash.io", "https://user:pass@example.upstash.io"])(
+    "refuses the unsafe endpoint %s",
+    (url) => {
+      expect(() =>
+        createRedisRateLimiter({
+          burst: 1,
+          refillIntervalMs: 1000,
+          namespace: "login",
+          url,
+          token: "rest-token",
+          hashKey: "hash-key",
+        })
+      ).toThrow("Redis REST requires an HTTPS endpoint")
+    }
+  )
 })
 
 describe("consumeAll", () => {

@@ -178,6 +178,114 @@ describe("collectEnvProblems", () => {
     )
   })
 
+  describe("AUTH_URL", () => {
+    it("is optional outside production", () => {
+      expect(
+        collectEnvProblems(envWith({ NODE_ENV: "development", AUTH_URL: undefined }))
+      ).toEqual([])
+    })
+
+    it("is required in production so Auth.js never trusts an arbitrary Host header", () => {
+      const problems = collectEnvProblems(
+        envWith({
+          NODE_ENV: "production",
+          AUTH_URL: undefined,
+          UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+          UPSTASH_REDIS_REST_TOKEN: "token",
+        })
+      )
+
+      expect(problems.some((problem) => problem.includes("AUTH_URL is required"))).toBe(true)
+    })
+
+    it("accepts the legacy NEXTAUTH_URL alias that Auth.js reads", () => {
+      expect(
+        collectEnvProblems(
+          envWith({
+            NODE_ENV: "production",
+            AUTH_URL: undefined,
+            NEXTAUTH_URL: "https://app.example.com",
+            UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+            UPSTASH_REDIS_REST_TOKEN: "token",
+          })
+        )
+      ).toEqual([])
+    })
+
+    it.each(["app.example.com", "ftp://app.example.com", "not a url"])(
+      "rejects the unsafe origin %j",
+      (value) => {
+        expect(
+          problemsFor(envWith({ AUTH_URL: value }), "AUTH_URL")
+        ).toHaveLength(1)
+      }
+    )
+  })
+
+  describe("distributed rate limiting", () => {
+    it("is optional outside production", () => {
+      expect(
+        collectEnvProblems(
+          envWith({
+            NODE_ENV: "development",
+            UPSTASH_REDIS_REST_URL: undefined,
+            UPSTASH_REDIS_REST_TOKEN: undefined,
+          })
+        )
+      ).toEqual([])
+    })
+
+    it("requires both Redis settings in production", () => {
+      const problems = collectEnvProblems(
+        envWith({
+          NODE_ENV: "production",
+          UPSTASH_REDIS_REST_URL: undefined,
+          UPSTASH_REDIS_REST_TOKEN: undefined,
+        })
+      )
+
+      expect(problems.some((problem) => problem.includes("UPSTASH_REDIS_REST_URL"))).toBe(true)
+      expect(problems.some((problem) => problem.includes("UPSTASH_REDIS_REST_TOKEN"))).toBe(true)
+    })
+
+    it("refuses a half-configured limiter in development too", () => {
+      const problems = collectEnvProblems(
+        envWith({
+          NODE_ENV: "development",
+          UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+          UPSTASH_REDIS_REST_TOKEN: undefined,
+        })
+      )
+
+      expect(problems.some((problem) => problem.includes("configured together"))).toBe(true)
+    })
+
+    it("requires an HTTPS endpoint with no embedded credentials", () => {
+      for (const url of ["http://example.upstash.io", "https://user:pass@example.upstash.io", "not a url"]) {
+        const problems = collectEnvProblems(
+          envWith({
+            UPSTASH_REDIS_REST_URL: url,
+            UPSTASH_REDIS_REST_TOKEN: "token",
+          })
+        )
+        expect(problems.some((problem) => problem.includes("absolute https URL"))).toBe(true)
+      }
+    })
+
+    it("accepts a complete production limiter", () => {
+      expect(
+        collectEnvProblems(
+          envWith({
+            NODE_ENV: "production",
+            AUTH_URL: "https://app.example.com",
+            UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+            UPSTASH_REDIS_REST_TOKEN: "token",
+          })
+        )
+      ).toEqual([])
+    })
+  })
+
   // One restart should be enough to learn everything that is wrong. Reporting
   // only the first problem turns a misconfigured deploy into a guessing game.
   it("reports every broken variable at once, not just the first", () => {
