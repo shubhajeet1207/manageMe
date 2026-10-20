@@ -191,6 +191,42 @@ export function collectEnvProblems(env: EnvSource = process.env): string[] {
     )
   }
 
+  // --- AUTH ORIGIN -------------------------------------------------------
+  // auth.config.ts intentionally refuses to trust Host in production unless
+  // Auth.js has a canonical origin to rewrite requests onto. Omitting this is
+  // otherwise discovered only when the first session read logs UntrustedHost.
+  const isProduction = read(env, "NODE_ENV") === "production"
+  const authUrl = read(env, "AUTH_URL") ?? read(env, "NEXTAUTH_URL")
+  if (isProduction && !authUrl) {
+    problems.push(
+      "AUTH_URL is required in production and must be the public http(s) origin of this app."
+    )
+  } else if (authUrl && !parsesAsHttpUrl(authUrl)) {
+    problems.push("AUTH_URL must be an absolute http(s) URL, e.g. https://app.example.com")
+  }
+
+  // --- DISTRIBUTED RATE LIMITING ----------------------------------------
+  // Auth and collection endpoints deliberately fail closed in production
+  // when the shared limiter is unavailable. Validate that dependency here so
+  // a deploy log names the missing configuration before every login becomes a
+  // generic "try again" response.
+  const redisUrl = read(env, "UPSTASH_REDIS_REST_URL")
+  const redisToken = read(env, "UPSTASH_REDIS_REST_TOKEN")
+
+  if (isProduction && (!redisUrl || !redisToken)) {
+    problems.push(
+      "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production for distributed rate limiting."
+    )
+  } else if (Boolean(redisUrl) !== Boolean(redisToken)) {
+    problems.push(
+      "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be configured together."
+    )
+  }
+
+  if (redisUrl && !parsesAsHttpsUrl(redisUrl)) {
+    problems.push("UPSTASH_REDIS_REST_URL must be an absolute https URL.")
+  }
+
   return problems
 }
 
@@ -198,6 +234,15 @@ function parsesAsHttpUrl(raw: string): boolean {
   try {
     const url = new URL(raw)
     return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+function parsesAsHttpsUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw)
+    return url.protocol === "https:" && !url.username && !url.password
   } catch {
     return false
   }

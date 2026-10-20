@@ -50,7 +50,11 @@ export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) 
     <nav aria-label="Main" className="flex flex-col">
       {sections.map((section, index) => (
         <SidebarGroup key={section.label ?? `ungrouped-${index}`} className="p-0">
-          {section.label ? <SidebarGroupLabel>{section.label}</SidebarGroupLabel> : null}
+          {section.label ? (
+            <SidebarGroupLabel className="eyebrow text-sidebar-foreground/80 mt-2">
+              {section.label}
+            </SidebarGroupLabel>
+          ) : null}
           <SidebarGroupContent>
             <SidebarMenu>
               {section.items.map((item) => (
@@ -58,7 +62,10 @@ export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) 
                   <SidebarMenuButton
                     render={<Link href={item.href} />}
                     isActive={pathname.startsWith(item.href)}
-                    className="data-active:bg-selected data-active:text-selected-foreground"
+                    // SpyMonk's nav: a transparent frame that becomes a small
+                    // raised window for the page you are on. The frame is
+                    // always 2px so activating an item never shifts the list.
+                    className="hover:border-sidebar-border/50 h-9 border-2 border-transparent font-medium data-active:border-sidebar-border data-active:bg-background data-active:font-semibold data-active:text-foreground data-active:shadow-[2px_2px_0_var(--sidebar-border)]"
                   >
                     <item.icon />
                     <span>{item.title}</span>
@@ -66,7 +73,7 @@ export function SidebarNav({ quickDropCount = 0 }: { quickDropCount?: number }) 
                   {/* An inbox you cannot see the size of is a folder. Omitted
                       at zero, because an empty inbox is success. */}
                   {item.href === "/quickdrop" && quickDropCount > 0 ? (
-                    <SidebarMenuBadge className="tabular-nums">
+                    <SidebarMenuBadge className="bg-window-coral border-2 border-[#201a3a] font-mono text-[11px] text-[#201a3a] tabular-nums peer-data-[size=default]/menu-button:top-2">
                       {quickDropCount}
                     </SidebarMenuBadge>
                   ) : null}

@@ -4,20 +4,23 @@ import { Slot } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+// Retro desktop buttons: an ink outline and a hard offset shadow that the
+// button sinks into on press, like the Ok / Cancel / Enter buttons on the mood
+// boards. Ghost and link stay flat; they are inline controls, not windows.
+const RAISED =
+  "border-2 border-card-border font-heading tracking-[0.02em] shadow-raised hover:translate-x-px hover:translate-y-px hover:shadow-press active:translate-x-[3px] active:translate-y-[3px] active:shadow-none"
+
 const buttonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-md text-sm font-medium whitespace-nowrap transition-all outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive:
-          "bg-destructive text-primary-foreground hover:bg-destructive/90",
-        outline:
-          "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
-        secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        default: `${RAISED} bg-cta font-normal text-cta-foreground hover:bg-cta-hovered`,
+        destructive: `${RAISED} bg-destructive font-normal text-primary-foreground hover:bg-destructive/90`,
+        outline: `${RAISED} bg-card font-normal text-card-foreground hover:bg-accent hover:text-accent-foreground`,
+        secondary: `${RAISED} bg-secondary font-normal text-secondary-foreground hover:bg-accent`,
         ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+          "border-2 border-transparent hover:border-card-border hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

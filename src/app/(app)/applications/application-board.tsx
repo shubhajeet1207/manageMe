@@ -52,26 +52,26 @@ function Column({
       className="flex w-64 shrink-0 flex-col xl:w-auto xl:min-w-0 xl:shrink"
     >
       <div
-        className={cn("h-[3px] w-full shrink-0 rounded-full", STATUS_ACCENT[status])}
+        className={cn("border-card-border h-2.5 w-full shrink-0 border-2", STATUS_ACCENT[status])}
         aria-hidden
       />
       <header className="flex shrink-0 items-center justify-between gap-2 px-0.5 pt-2.5 pb-2">
         <h2
           className={cn(
-            "truncate text-[11px] font-semibold tracking-[0.09em] uppercase",
+            "eyebrow truncate font-bold",
             isOutcome && "text-muted-foreground"
           )}
         >
           {STATUS_LABELS[status]}
         </h2>
-        <span className="text-subtlest shrink-0 text-[11px] tabular-nums">
+        <span className="border-card-border bg-card shrink-0 border-2 px-1.5 font-mono text-[11px] tabular-nums">
           {applications.length}
         </span>
       </header>
       <div
         className={cn(
-          "scroll-rail flex min-h-24 flex-1 flex-col gap-1.5 rounded-lg p-1.5 transition-colors xl:min-h-0 xl:overflow-y-auto",
-          isOutcome ? "border-border border border-dashed" : "bg-well",
+          "scroll-rail flex min-h-24 flex-1 flex-col gap-2 rounded-lg p-1.5 transition-colors xl:min-h-0 xl:overflow-y-auto",
+          isOutcome ? "border-card-border border-2 border-dashed" : "bg-well border-card-border border-2",
           isOver && "ring-ring ring-2"
         )}
       >
