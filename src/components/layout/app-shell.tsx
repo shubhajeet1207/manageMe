@@ -23,7 +23,7 @@ const MAIN_CONTENT_ID = "main-content"
 // state where the link has slid into view without an indicator would be an SC
 // 2.4.7 failure on the one control that exists only for keyboard users.
 const SKIP_LINK =
-  "border-border bg-surface text-foreground shadow-overlay focus:ring-ring fixed -top-20 left-3 z-50 rounded-md border px-3 py-2 text-sm font-medium outline-none transition-[top] focus:top-3 focus:ring-2"
+  "border-card-border bg-surface text-foreground shadow-raised focus:ring-ring fixed -top-20 left-3 z-50 rounded-md border-2 px-3 py-2 text-sm font-medium outline-none transition-[top] focus:top-3 focus:ring-2"
 
 export function AppShell({
   user,
@@ -47,10 +47,20 @@ export function AppShell({
       <a href={`#${MAIN_CONTENT_ID}`} className={SKIP_LINK}>
         Skip to main content
       </a>
-      <Sidebar className="border-sidebar-border">
-        <SidebarHeader className="h-14 flex-row items-center gap-2 px-4">
-          <span className="bg-stage-applied size-2 rounded-[2px]" aria-hidden />
-          <span className="text-[15px] font-semibold tracking-tight">ManageMe</span>
+      <Sidebar className="border-sidebar-border group-data-[side=left]:border-r-2">
+        {/* The SpyMonk brand block: a coral tile with an ink edge and a hard
+            shadow, then the name in the title-bar lettering. */}
+        <SidebarHeader className="h-16 flex-row items-center gap-3 px-4">
+          <span
+            aria-hidden
+            className="bg-window-coral grid size-9 shrink-0 place-items-center border-2 border-[#201a3a] text-[#201a3a] shadow-[3px_3px_0_#201a3a]"
+          >
+            <span className="font-heading text-lg leading-none">M</span>
+          </span>
+          <span className="grid leading-tight">
+            <span className="font-heading text-lg tracking-[0.02em]">ManageMe</span>
+            <span className="eyebrow text-sidebar-foreground/80 text-[9px]">Career OS</span>
+          </span>
         </SidebarHeader>
         <SidebarContent className="px-2">
           <SidebarNav quickDropCount={quickDropCount} />

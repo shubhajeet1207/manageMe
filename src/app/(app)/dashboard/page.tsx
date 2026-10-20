@@ -91,14 +91,14 @@ export default async function DashboardPage() {
             {tiles.map((tile) => (
               <div
                 key={tile.label}
-                className="border-border bg-card rounded-lg border px-4 py-3"
+                className="border-card-border bg-card shadow-raised border-2 px-4 py-3"
               >
-                <dt className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+                <dt className="eyebrow text-muted-foreground font-bold">
                   {tile.label}
                 </dt>
                 {/* A dash, never a zero: before anything is recorded, a zero
                     asserts that nothing happened when nothing was watching. */}
-                <dd className="mt-1 text-2xl font-semibold tabular-nums">
+                <dd className="font-heading mt-1 text-3xl tabular-nums">
                   {tile.value ?? "—"}
                 </dd>
                 {tile.note && (
@@ -112,15 +112,15 @@ export default async function DashboardPage() {
 
           <section
             aria-label="Pipeline"
-            className="border-border bg-card space-y-4 rounded-lg border p-4"
+            className="border-card-border bg-card shadow-overlay space-y-4 border-2 p-4"
           >
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-muted-foreground text-[11px] font-medium tracking-[0.07em] uppercase">
+              <h2 className="eyebrow text-muted-foreground font-bold">
                 Pipeline
               </h2>
               <Link
                 href="/analytics"
-                className="text-muted-foreground hover:text-foreground text-[11px] font-medium transition-colors"
+                className="eyebrow text-primary hover:text-foreground font-bold underline underline-offset-2 transition-colors"
               >
                 See the full picture →
               </Link>
@@ -135,18 +135,18 @@ export default async function DashboardPage() {
                   )}
                 >
                   <div
-                    className={cn("h-[3px] w-full rounded-full", STATUS_ACCENT[status])}
+                    className={cn("border-card-border h-3 w-full border-2", STATUS_ACCENT[status])}
                     aria-hidden
                   />
                   <p
                     className={cn(
-                      "mt-2 truncate text-[11px] font-semibold tracking-[0.09em] uppercase",
+                      "eyebrow mt-2 truncate font-bold",
                       status === "REJECTED" && "text-muted-foreground"
                     )}
                   >
                     {STATUS_LABELS[status]}
                   </p>
-                  <p className="mt-0.5 text-lg font-medium tabular-nums">{count}</p>
+                  <p className="font-heading mt-0.5 text-2xl tabular-nums">{count}</p>
                 </div>
               ))}
             </div>

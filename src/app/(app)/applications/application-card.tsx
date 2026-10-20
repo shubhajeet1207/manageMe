@@ -17,7 +17,7 @@ import { DeleteApplicationDialog } from "./delete-application-dialog"
 // border base and raises its alpha until the seam clears 3:1 (globals.css has
 // the measurements), and the shadow stays as the depth cue.
 const CARD_SURFACE =
-  "bg-card border-card-border shadow-raised flex w-full items-start gap-1 rounded-md border px-2 py-1.5 text-left"
+  "bg-card border-card-border shadow-[2px_2px_0_var(--card-border)] flex w-full items-start gap-1 rounded-md border-2 px-2 py-1.5 text-left"
 
 // The -mr-0.5 optical nudge moved to the action column: with a second control
 // stacked beneath the grip, nudging only the grip leaves the two right edges
@@ -156,7 +156,7 @@ export function ApplicationCardOverlay({
   return (
     <div
       inert
-      className={cn(CARD_SURFACE, "ring-ring shadow-overlay cursor-grabbing ring-2")}
+      className={cn(CARD_SURFACE, "ring-ring shadow-overlay cursor-grabbing rotate-1 ring-2")}
     >
       <div className="min-w-0 flex-1">
         <CardSummary application={application} />
@@ -230,7 +230,7 @@ export function ApplicationCard({
       // instead, which reads as raised in both themes.
       className={cn(
         CARD_SURFACE,
-        "hover:bg-card-hovered hover:border-card-border-hovered hover:shadow-overlay cursor-grab transition-[background-color,border-color,box-shadow] active:cursor-grabbing",
+        "hover:bg-card-hovered hover:border-card-border-hovered hover:shadow-[3px_3px_0_var(--card-border-hovered)] cursor-grab transition-[background-color,border-color,box-shadow] active:cursor-grabbing",
         isDragging && "opacity-40"
       )}
     >
