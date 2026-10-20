@@ -63,11 +63,24 @@ function getClient(): ReturnType<typeof createPrismaClient> {
  *
  * Methods are bound to the real client because Prisma's delegates rely on their
  * own `this`; returning them unbound would break the moment one was destructured.
+ *
+ * The empty target is an override layer, and both traps below exist for the
+ * same caller: `vi.spyOn(prisma, "$transaction")`. vitest first checks
+ * `key in object` — which without `has` asked the empty target and answered
+ * false — then installs the spy with `Object.defineProperty` on this Proxy,
+ * which lands on the target. Without the own-property check in `get`, that
+ * spy would sit there unread while every call went to the real method. An
+ * override is returned as-is, never bound: binding would hand callers a copy
+ * that is not the spy, so its calls would go unrecorded.
  */
 export const prisma = new Proxy({} as ReturnType<typeof createPrismaClient>, {
-  get(_target, property) {
+  get(target, property) {
+    if (Object.hasOwn(target, property)) return Reflect.get(target, property)
     const actual = getClient()
     const value = Reflect.get(actual, property, actual)
     return typeof value === "function" ? value.bind(actual) : value
+  },
+  has(target, property) {
+    return Reflect.has(target, property) || Reflect.has(getClient(), property)
   },
 })
