@@ -1,129 +1,71 @@
+![ManageMe — a personal career workspace connecting applications, files, follow-up work, and progress](assets/manageme-technical-banner.svg)
+
 # ManageMe
 
-A personal career & productivity management platform.
+**Run your career like a system, not a scatter of tabs.**
 
-Implemented so far:
+ManageMe is a private career workspace for keeping a job search and the work around it in one reliable place. Track each opportunity, retain the exact resume and supporting files that matter, turn follow-ups into work you can complete, and see what is actually moving through your pipeline.
 
-- **Phase 1 — Foundation:** auth (sign up, log in, profile, password), app
-  shell, design system.
-  See `docs/superpowers/specs/2026-08-24-phase1-foundation-design.md`.
-- **Phase 2 — Core career:** companies, applications, a seven-stage status
-  pipeline, a drag-and-drop board, and a table view that filters by status and
-  sorts by company, role, pipeline stage, applied date or last update. The sort
-  lives in the URL (`?sort=role&dir=asc`) and is applied on the server, so a
-  sorted view is a link you can send someone.
-  See `docs/superpowers/specs/2026-09-12-phase2-core-career-design.md`.
-- **Phase 3 — Resume system:** named resume slots, each holding an append-only
-  history of uploaded PDF versions with one nominated as current, previewed in
-  the browser's own PDF viewer. An application can record which version was
-  actually sent, and each slot reports how the applications that used it now
-  stand. Uploaded bytes are stored outside `public/` and are served only
-  through a route that checks ownership first — there is no URL that hands a
-  file to someone who guesses it.
-  See `docs/superpowers/specs/2026-09-13-phase3-resume-system-design.md`.
-- **Phase 4 — Documents:** a private document vault — offer letters,
-  certificates, IDs — with tags instead of folders, server-side search whose
-  query lives in the URL, optional expiry dates, and an accepted file type
-  decided by the bytes rather than by what the browser claimed.
-  See `docs/superpowers/specs/2026-09-13-phase4-documents-design.md`.
-- **Phase 5 — Productivity:** projects and tasks (a task can belong to a
-  project *or* to a job application), tagged links, QuickDrop capture and
-  triage, and a credential vault encrypted at rest with AES-256-GCM under its
-  own key.
-  See `docs/superpowers/specs/2026-09-13-phase5-productivity-design.md`.
-- **Phase 6 — Analytics:** every status transition recorded through a single
-  chokepoint, and an `/analytics` page reporting the pipeline funnel,
-  stage-to-stage conversion, time in stage, and per-company and per-resume
-  outcomes.
-  See `docs/superpowers/specs/2026-09-13-phase6-analytics-design.md`.
+[Installation & deployment](docs/installation/README.md) · [Product roadmap](docs/superpowers/roadmap.md) · [Implementation specs](docs/superpowers/specs/)
 
-## Local setup
+## What you can do
 
-1. Install dependencies: `pnpm install`
-2. Copy `.env.example` to `.env` and fill it in. `.env.example` is the full
-   list and explains each variable; the ones you cannot start without are:
-   - `DATABASE_URL` — a PostgreSQL connection string (a free
-     [Neon](https://neon.tech) project works well for local dev)
-   - `AUTH_SECRET` — generate with `pnpm dlx auth secret`
-   - `NEXT_PUBLIC_APP_URL` — `http://localhost:3000` for local dev
-   - `CREDENTIALS_KEY` — 32 random bytes, base64 (`openssl rand -base64 32`).
-     Encrypts stored credential passwords. Distinct from `AUTH_SECRET` on
-     purpose; the Credentials page refuses to work without it.
-   - `STORAGE_DRIVER` — which driver serves uploaded resume and document
-     bytes. `"local"` is the only supported value today; anything else throws
-     at startup rather than silently writing uploads to a container's
-     ephemeral disk.
-   - `UPLOADS_DIR` — where the local driver keeps those bytes, resolved
-     against the process's working directory. Defaults to `.uploads`, which is
-     gitignored and deliberately outside `public/` so nothing is statically
-     served.
-3. Apply the database schema: `pnpm exec prisma migrate deploy` — it applies
-   the committed migrations exactly, and is the same command used in CI and in
-   production. (Use `pnpm exec`, not `pnpm dlx` — `dlx` fetches a newer Prisma
-   CLI whose commands differ from the version this project pins.)
-   Reach for `pnpm exec prisma migrate dev` only when you are *authoring* a new
-   migration from a schema change: it is interactive, it writes new migration
-   files, and it can offer to reset the database.
-4. Start the dev server: `pnpm dev`
+| Area | What it gives you |
+| --- | --- |
+| **Application pipeline** | Track companies and roles through Saved, Applied, Screening, Interview, Offer, Accepted, and Rejected. Use a drag-and-drop board or a sortable, filterable table. |
+| **Career context** | Keep role details, source links, location, work mode, salary range, notes, company information, and the precise resume version sent for an application together. |
+| **Resume library** | Create named resume tracks, upload append-only PDF versions, select the current version, and retain the version actually used for every application. Add skills and portfolio projects to each track. |
+| **Document vault** | Store private career documents such as offer letters and certificates with tags, search, optional company links, and expiry-date visibility. |
+| **Projects and tasks** | Manage standalone projects and tasks, or attach a task to an application so follow-ups stay in context. Track due dates and completion. |
+| **QuickDrop and saved links** | Capture a thought or URL quickly, then triage it into a task, project, or saved reference. Keep a taggable library of useful links. |
+| **Credential vault** | Keep third-party login details alongside your career work. Stored passwords are encrypted at rest with a dedicated AES-256-GCM key. |
+| **Career analytics** | See your current pipeline, funnel and conversion history, stage timing, active-work velocity, company and resume outcomes, and recent activity based on recorded application changes. |
 
-## Testing
+## How it fits together
 
-- Unit/integration tests: `pnpm test`. The integration tests run against the
-  real database in `DATABASE_URL` and clean up their own rows, so point it at a
-  database you are willing to have written to — never a production one.
-- Coverage: `pnpm exec vitest run --coverage` (HTML report in `coverage/`).
-  The provider, `@vitest/coverage-v8`, is not in `devDependencies` yet —
-  vitest offers to install it the first time you ask for coverage. No
-  thresholds are enforced; see the note in `vitest.config.ts` for why, and for
-  how to set one that means something.
-- End-to-end tests: `pnpm test:e2e`. Locally this reuses a dev server on port
-  3000 if one is already running and starts `pnpm dev` otherwise; under `CI=1`
-  it builds and starts the production server instead. The suite runs against
-  Chromium, Firefox and WebKit — `pnpm test:e2e --project=chromium` is the fast
-  path while iterating.
+1. **Capture the opportunity.** Add a company and application with the details you need to decide and act.
+2. **Attach the evidence.** Link the resume version that was sent; file related documents; keep relevant links and notes close by.
+3. **Make work visible.** Create application-linked follow-ups, standalone tasks, projects, or a quick inbox item to triage later.
+4. **Move the pipeline deliberately.** Update status from a board or form. ManageMe records those changes so its history reflects the stages an opportunity has actually reached.
+5. **Learn from the search.** Use the dashboard and analytics to inspect the live pipeline, conversion, stage duration, activity, and outcomes by company or resume.
 
-## CI
+## Privacy and data handling
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull request:
-typecheck, lint, and the Vitest suite, then the Playwright suite. A new push
-cancels the run still in flight for the same branch.
+ManageMe is designed around an account-scoped personal workspace:
 
-CI never touches the developer's database. Each job brings up its own
-PostgreSQL service container and runs `prisma migrate deploy` against it, so
-concurrent runs cannot race each other's rows.
+- Every core record is owned by the signed-in user; file download routes check ownership before serving bytes.
+- Resumes and documents are stored outside `public/` and are not exposed as guessable static URLs.
+- Uploaded file content is validated by type, not only by the filename supplied by the browser.
+- Credential passwords are encrypted with a dedicated application key. Labels, usernames, URLs, and notes are intentionally readable metadata so they can be listed without decrypting every record.
+- Product-usage analytics are opt-in. Disabling them removes the recorded product events for the account.
 
-## Deployment
+These protections do not make the product a substitute for a dedicated password manager, a backup strategy, or legal/financial advice. In particular, a local upload directory must be backed up separately, and cloud storage credentials should be scoped to only the application bucket.
 
-A Node.js server (`next start`); see Next.js's own
-[deploying](https://nextjs.org/docs/app/getting-started/deploying) guide for
-the other options. From a clean checkout:
+## Product boundaries
 
-1. `pnpm install --frozen-lockfile`
-2. `pnpm exec prisma generate` — Prisma Client is generated code; nothing
-   imports successfully until this has run.
-3. `pnpm build`
-4. `pnpm exec prisma migrate deploy` — against the production database, before
-   the new build starts serving. It is non-interactive, applies only
-   already-committed migrations, and never resets or drops anything.
-5. `pnpm start`
+ManageMe is intentionally a focused, single-person workspace. It does not currently offer public sharing, team collaboration, global search across every module, resume parsing or AI rewriting, OCR, recurring tasks, manual card ordering, or custom pipeline stages. Document expiry is a visual signal today, not an automated reminder.
 
-Set the same environment variables as above, with `NEXT_PUBLIC_APP_URL` at the
-deployed origin, plus one that only production needs:
+## Technology
 
-- `AUTH_URL` — the deployed origin, e.g. `https://app.example.com`. In
-  production the app refuses to trust the `Host`/`X-Forwarded-Host` header
-  unless an origin is pinned this way, because next-auth builds callback and
-  redirect URLs out of that header. Without it every request that touches a
-  session answers 500 and the logs say `UntrustedHost`. `NEXT_PUBLIC_APP_URL`
-  cannot stand in for it: next-auth reads `AUTH_URL` and `NEXTAUTH_URL` and no
-  other name.
+| Layer | Stack |
+| --- | --- |
+| Application | Next.js 16, React 19, TypeScript |
+| UI | Tailwind CSS v4, shadcn/ui, Lucide, dnd-kit |
+| Identity and data | Auth.js v5, Prisma 7, PostgreSQL |
+| File storage | Local durable volume, Cloudflare R2, or Backblaze B2 |
+| Quality | Vitest and Playwright |
+| Hosting | Node.js host or Vercel with object storage |
 
-`AUTH_SECRET` and `CREDENTIALS_KEY` are independent secrets
-with different blast radii — do not reuse one as the other — and rotating
-`CREDENTIALS_KEY` needs `CREDENTIALS_KEY_PREVIOUS`; `.env.example` describes
-that procedure.
+## Repository guide
 
-## Tech stack
+```text
+src/app/                 App Router pages, routes, and server actions
+src/components/          Shared UI and application layout
+src/server/              Services, repositories, file handling, storage, and validation
+prisma/                  PostgreSQL schema and committed migrations
+e2e/                     Browser workflows and fixtures
+docs/                    Installation, product specifications, roadmap, and design notes
+assets/                  README artwork and asset notes
+```
 
-Next.js 16 · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Prisma ·
-PostgreSQL · Auth.js v5 · Vitest · Playwright
+Start with the [installation and deployment guide](docs/installation/README.md). The specifications in `docs/superpowers/specs/` document product decisions and acceptance criteria; they may describe historical phases or planned work, so the feature table above is the repository's concise guide to the current product.
