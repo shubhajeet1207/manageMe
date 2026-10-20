@@ -36,9 +36,8 @@ export const STATUS_ACCENT: Record<ApplicationStatus, string> = {
   REJECTED: "bg-stage-rejected",
 }
 
-// Jira's status lozenge: the ADS accent pair for the hue —
-// color.background.accent.<hue>.subtler behind color.text.accent.<hue> — set in
-// globals.css so the board rules and these chips cannot drift apart.
+// A status tag: a tint behind a dark text of the same hue (4.5:1+, measured in
+// globals.css) so the board rules and these chips cannot drift apart.
 const STATUS_CLASSES: Record<ApplicationStatus, string> = {
   SAVED: "bg-lozenge-saved text-lozenge-saved-fg",
   APPLIED: "bg-lozenge-applied text-lozenge-applied-fg",
@@ -54,9 +53,9 @@ export function StatusBadge({ status }: { status: ApplicationStatus }) {
     <Badge
       variant="secondary"
       className={cn(
-        // Uppercase is the lozenge's most recognisable Jira tell. It is CSS
-        // rather than data, so the accessible name stays "Interview".
-        "rounded-sm px-1.5 py-0 text-[11px] leading-4 font-bold tracking-[0.03em] uppercase",
+        // Typewriter caps with an edge in the tag's own colour. Uppercase is
+        // CSS rather than data, so the accessible name stays "Interview".
+        "rounded-none border-current/45 px-1.5 py-0 font-mono text-[10px] leading-4 font-bold tracking-[0.06em] uppercase",
         STATUS_CLASSES[status]
       )}
     >
