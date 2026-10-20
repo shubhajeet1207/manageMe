@@ -7,26 +7,39 @@ datasource db {
 }
 
 model User {
-  id             String   @id @default(cuid())
-  name           String?
-  email          String   @unique
-  hashedPassword String
-  image          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                 String    @id @default(cuid())
+  name               String?
+  email              String    @unique
+  hashedPassword     String
+  image              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  sessionVersion     Int       @default(0)
+  mfaSecretEncrypted String?
+  mfaEnabledAt       DateTime?
 
-  companies      Company[]
-  applications   Application[]
-  resumes        Resume[]
-  resumeVersions ResumeVersion[]
-  resumeProjects ResumeProject[]
-  documents      Document[]
-  projects       Project[]
-  tasks          Task[]
-  links          Link[]
-  quickDropItems QuickDropItem[]
-  credentials    Credential[]
-  statusEvents   ApplicationStatusEvent[]
+  companies         Company[]
+  applications      Application[]
+  resumes           Resume[]
+  resumeVersions    ResumeVersion[]
+  resumeProjects    ResumeProject[]
+  documents         Document[]
+  projects          Project[]
+  tasks             Task[]
+  links             Link[]
+  quickDropItems    QuickDropItem[]
+  credentials       Credential[]
+  statusEvents      ApplicationStatusEvent[]
+  preferences       UserPreference?
+  billingAccount    BillingAccount?
+  productEvents     ProductEvent[]
+  lifecycleMessages LifecycleMessage[]
+  contacts          Contact[]
+  interviews        Interview[]
+  reminders         Reminder[]
+  uploadIntents     UploadIntent[]
+  authSessions      AuthSession[]
+  mfaRecoveryCodes  MfaRecoveryCode[]
 }
 
 enum ApplicationStatus {
@@ -94,6 +107,8 @@ model Application {
   resumeVersion ResumeVersion?           @relation(fields: [resumeVersionId], references: [id], onDelete: Restrict)
   tasks         Task[]
   statusEvents  ApplicationStatusEvent[]
+  interviews    Interview[]
+  reminders     Reminder[]
 
   @@index([userId, status])
   @@index([userId, companyId])
@@ -331,6 +346,7 @@ model Task {
   // (§7.4). It loses context, not the sentence the user typed.
   project     Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
   application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  reminders   Reminder[]
 
   @@index([userId, status, dueDate])
   /// The activity timeline makes completedAt a sort key for the first time
@@ -411,4 +427,197 @@ model Credential {
 
   @@unique([userId, label])
   @@index([userId])
+}
+
+enum Plan {
+  FREE
+  PRO
+}
+
+model UserPreference {
+  userId                String   @id
+  analyticsEnabled      Boolean  @default(false)
+  lifecycleEmailEnabled Boolean  @default(false)
+  reminderEmailEnabled  Boolean  @default(false)
+  updatedAt             DateTime @updatedAt
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BillingAccount {
+  userId            String    @id
+  customerId        String?   @unique
+  subscriptionId    String?   @unique
+  plan              Plan      @default(FREE)
+  status            String    @default("inactive")
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
+  lastReconciledAt  DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Store only the verified provider event ID/type; billing payloads contain PII.
+model BillingWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+model ProductEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  name       String
+  properties Json
+  dedupeKey  String?  @unique
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([name, createdAt])
+  @@index([userId, createdAt])
+}
+
+enum MessageState {
+  PENDING
+  PROCESSING
+  SENT
+  SKIPPED
+  FAILED
+}
+
+model LifecycleMessage {
+  id             String       @id @default(cuid())
+  userId         String
+  kind           String
+  dedupeKey      String       @unique
+  payload        Json
+  state          MessageState @default(PENDING)
+  attempts       Int          @default(0)
+  availableAt    DateTime     @default(now())
+  lockedUntil    DateTime?
+  claimToken     String?
+  firstAttemptAt DateTime?
+  providerId     String?
+  lastErrorCode  String?
+  sentAt         DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([state, availableAt])
+  @@index([state, lockedUntil])
+  @@index([userId, createdAt])
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  email     String?
+  company   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, name, id])
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+model Interview {
+  id            String          @id @default(cuid())
+  userId        String
+  applicationId String
+  startsAt      DateTime
+  timezone      String          @default("UTC")
+  round         String
+  meetingUrl    String?
+  notes         String?
+  status        InterviewStatus @default(SCHEDULED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  reminders     Reminder[]
+
+  @@index([userId, startsAt, id])
+  @@index([userId, applicationId])
+}
+
+enum ReminderState {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Reminder {
+  id            String        @id @default(cuid())
+  userId        String
+  applicationId String?
+  taskId        String?
+  interviewId   String?
+  dueAt         DateTime
+  title         String
+  state         ReminderState @default(PENDING)
+  dedupeKey     String?       @unique
+  queuedAt      DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application   Application?  @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  task          Task?         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  interview     Interview?    @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+
+  @@index([userId, state, dueAt, id])
+  @@index([state, dueAt, queuedAt])
+}
+
+model UploadIntent {
+  id               String    @id @default(cuid())
+  userId           String
+  kind             String
+  storageKey       String    @unique
+  contentType      String
+  sizeBytes        Int
+  originalFilename String
+  metadata         Json
+  expiresAt        DateTime
+  completedAt      DateTime?
+  resultId         String?
+  createdAt        DateTime  @default(now())
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([expiresAt, completedAt])
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+}
+
+model MfaRecoveryCode {
+  id       String    @id @default(cuid())
+  userId   String
+  codeHash String
+  usedAt   DateTime?
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, codeHash])
 }
