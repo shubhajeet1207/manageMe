@@ -5,39 +5,41 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
-   Atlassian Design System palette.
+   Retro desktop palette — shared with SpyMonk Encyclopedia.
 
-   Every colour below is a literal value from @atlaskit/tokens@16.12.0 — the
-   `atlassian-light` and `atlassian-dark` themes Atlassian ships for Jira — with
-   the ADS token name in the comment beside it. They are not eyeballed
-   approximations, so please do not "tidy" one into a neighbouring shade.
+   The look is a 90s desktop drawn as flat illustration: cream "paper" windows
+   with thick ink outlines, coral / orange / lavender / tan title bars, square
+   corners, and hard offset shadows instead of soft elevation. Light mode is
+   the paper desk; dark mode is the same windows at night (ink desk, cream
+   outlines).
 
-   Two things that look like mistakes but are not:
+   Contrast was measured, not assumed: every text pairing below clears 4.5:1
+   and every boundary or focus colour 3:1 against the surfaces it sits on, in
+   both themes (84 checks; the ratios are noted beside the values). Please
+   re-measure before nudging a shade.
 
-   * The borders are 8-digit hex (`#0B120E24`, `#E3E4F21F`). ADS `color.border`
-     is deliberately translucent, which is what lets Jira stack a sunken page,
-     a column well and a raised card and still have every seam read cleanly —
-     the border darkens whatever is behind it instead of drawing a fixed grey
-     line across three different surfaces. Flattening them to solids loses that.
-
-   * Offer is teal and Accepted is green. Two greens side by side are
-     indistinguishable at a glance, so the pipeline borrows ADS's teal accent
-     for Offer.
-
-   Contrast was measured, not assumed; the notes record the ratios.
+   Two deliberate choices:
+   * --primary is brick red, not the gold of the buttons. Primary is also used
+     as link and label text, and gold on cream is ~1.6:1. Buttons use their own
+     --cta token instead.
+   * Structural edges (cards, windows, fields) are solid ink, not translucent.
+     The retro look depends on the outline, and solid ink is also the strongest
+     boundary available (15:1 on paper).
 --------------------------------------------------------------------------- */
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Atlassian Sans is proprietary and cannot be shipped, so Inter (loaded via
-     next/font/google in app/layout.tsx) stands in front of ADS's own
-     font.family.body fallback stack. */
-  --font-sans: var(--font-inter), ui-sans-serif, -apple-system,
-    BlinkMacSystemFont, "Segoe UI", Ubuntu, "Helvetica Neue", sans-serif;
-  /* ADS font.family.code, minus the proprietary Atlassian Mono. */
-  --font-mono: ui-monospace, Menlo, "Segoe UI Mono", "Ubuntu Mono", monospace;
-  --font-heading: var(--font-sans);
+  /* Trebuchet first, as in SpyMonk; Inter (next/font) is the cross-platform
+     fallback where Trebuchet is not installed. */
+  --font-sans: "Trebuchet MS", var(--font-inter), "Segoe UI", ui-sans-serif,
+    -apple-system, BlinkMacSystemFont, sans-serif;
+  /* Labels, eyebrows and code: the typewriter voice of the theme. */
+  --font-mono: var(--font-space-mono), "Cascadia Code", Consolas, ui-monospace,
+    Menlo, monospace;
+  /* Window titles and page headings: the chunky lettering of the title bars. */
+  --font-display: var(--font-lilita), "Trebuchet MS", ui-sans-serif, sans-serif;
+  --font-heading: var(--font-display);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -53,6 +55,17 @@
   --color-selected: var(--selected);
   --color-selected-foreground: var(--selected-foreground);
   --color-subtlest: var(--subtlest);
+  --color-cta: var(--cta);
+  --color-cta-hovered: var(--cta-hovered);
+  --color-cta-foreground: var(--cta-foreground);
+  /* Title-bar colours, straight from the mood boards. */
+  --color-window-coral: var(--window-coral);
+  --color-window-orange: var(--window-orange);
+  --color-window-lavender: var(--window-lavender);
+  --color-window-tan: var(--window-tan);
+  /* Fixed in both themes, for sections that must stay ink-on-paper. */
+  --color-ink: #201a3a;
+  --color-paper: #fff4e7;
   --color-stage-saved: var(--stage-saved);
   --color-stage-applied: var(--stage-applied);
   --color-stage-screening: var(--stage-screening);
@@ -98,180 +111,180 @@
   --color-card-hovered: var(--card-hovered);
   --color-card-border: var(--card-border);
   --color-card-border-hovered: var(--card-border-hovered);
-  /* ADS Shape: radius.xsmall 2 · small 4 · medium 6 · large 8 · xlarge 12 ·
-     xxlarge 16. Jira's tight corners are a large part of why it reads as Jira,
-     so the scale is the literal token set rather than a multiplier chain. */
-  --radius-sm: 0.125rem;
-  --radius-md: 0.25rem;
-  --radius-lg: 0.375rem;
-  --radius-xl: 0.5rem;
-  --radius-2xl: 0.75rem;
-  --radius-3xl: 1rem;
-  --radius-4xl: 1.25rem;
+  /* Square corners everywhere, like the windows on the boards. Pills and
+     avatars use rounded-full, which is not a token, and stay round. */
+  --radius-sm: 0rem;
+  --radius-md: 0rem;
+  --radius-lg: 0rem;
+  --radius-xl: 0rem;
+  --radius-2xl: 0rem;
+  --radius-3xl: 0rem;
+  --radius-4xl: 0rem;
   --shadow-raised: var(--elevation-raised);
   --shadow-overlay: var(--elevation-overlay);
+  --shadow-press: var(--elevation-press);
 }
 
 :root {
-  --background: #f8f8f8; /* elevation.surface.sunken */
-  --foreground: #292a2e; /* color.text */
-  --surface: #ffffff; /* elevation.surface */
-  --card: #ffffff; /* elevation.surface.raised */
-  --card-foreground: #292a2e; /* color.text */
-  --popover: #ffffff; /* elevation.surface.overlay */
-  --popover-foreground: #292a2e; /* color.text */
-  --primary: #1868db; /* color.background.brand.bold */
-  --primary-foreground: #ffffff; /* color.text.inverse */
-  --secondary: #f0f1f2; /* color.background.accent.gray.subtlest */
-  --secondary-foreground: #292a2e; /* color.text */
-  --muted: #dddee1; /* color.background.accent.gray.subtler */
-  --muted-foreground: #505258; /* color.text.subtle — 7.35:1 on the page */
-  --subtlest: #6b6e76; /* color.text.subtlest — 4.51:1 on the well */
-  --accent: #f0f1f2; /* elevation.surface.hovered */
-  --accent-foreground: #292a2e; /* color.text */
-  --destructive: #c9372c; /* color.background.danger.bold */
-  --border: #0b120e24; /* color.border — translucent on purpose */
-  /* color.border's alpha, raised until the seam is a seam. A raised card sits
-     on the column well, and #0B120E24 over white measures 1.20:1 against
-     #F0F1F2 — no edge at all, which is how the board lost its cards. Same
-     translucent base, so the seam still darkens whatever surface is behind it
-     (well 3.38:1, sunken page 3.60:1), now past the 3:1 SC 1.4.11 asks of a
-     boundary. Hovered is one step further, 4.39:1. */
-  --card-border: #0b120e85;
-  --card-border-hovered: #0b120e99;
-  /* ADS's elevation.surface.raised.hovered is #F0F1F2 — byte-identical to
-     --well, so an ADS hover fill would dissolve a card into the column it sits
-     in. White is the far side of the well, so the light card keeps its fill and
-     carries hover in the border and the shadow instead. */
-  --card-hovered: #ffffff;
-  --input: #8c8f97; /* color.border.input — 3.24:1 against a card */
-  --field: #ffffff; /* color.background.input */
-  --field-hovered: #f8f8f8; /* color.background.input.hovered */
-  --ring: #4688ec; /* color.border.focused — 3.10:1 at full strength */
-  --selected: #e9f2fe; /* color.background.selected */
-  --selected-foreground: #1868db; /* color.text.selected */
-  --well: #f0f1f2; /* elevation.surface.hovered, as a sunken container */
-  /* Rules and dots: color.background.accent.<hue>.bolder */
-  --stage-saved: #6b6e76;
-  --stage-applied: #1868db;
-  --stage-screening: #964ac0;
-  --stage-interview: #946f00;
-  --stage-offer: #227d9b;
-  --stage-accepted: #1f845a;
-  --stage-rejected: #c9372c;
-  /* Lozenges: color.background.accent.<hue>.subtler + color.text.accent.<hue>,
-     which is exactly how Jira draws a status lozenge. */
-  --lozenge-saved: #dddee1;
-  --lozenge-saved-fg: #505258; /* 5.81:1 */
-  --lozenge-applied: #cfe1fd;
-  --lozenge-applied-fg: #1558bc; /* 5.02:1 */
-  --lozenge-screening: #eed7fc;
-  --lozenge-screening-fg: #803fa5; /* 4.97:1 */
-  --lozenge-interview: #f5e989;
-  --lozenge-interview-fg: #7f5f01; /* 4.77:1 */
-  --lozenge-offer: #c6edfb;
-  --lozenge-offer-fg: #206a83; /* 4.90:1 */
-  --lozenge-accepted: #baf3db;
-  --lozenge-accepted-fg: #216e4e; /* 4.97:1 */
-  --lozenge-rejected: #ffd5d2;
-  --lozenge-rejected-fg: #ae2e24; /* 4.88:1 */
+  --background: #fff4e7; /* paper desk */
+  --foreground: #201a3a; /* ink — 15.6:1 on paper */
+  --surface: #fffaf3; /* window */
+  --card: #fffaf3;
+  --card-foreground: #201a3a;
+  --popover: #fffaf3;
+  --popover-foreground: #201a3a;
+  --primary: #a63426; /* brick — 6.4:1 on paper, 5.4:1 on the well */
+  --primary-foreground: #fffaf3; /* 6.7:1 on brick */
+  --cta: #f2b755; /* gold button face */
+  --cta-hovered: #f4c36f;
+  --cta-foreground: #201a3a; /* 9.6:1 on gold */
+  --secondary: #f4dccb; /* peach */
+  --secondary-foreground: #201a3a;
+  --muted: #f4dccb;
+  --muted-foreground: #5c5266; /* 7.1:1 on paper, 5.9:1 on the well */
+  --subtlest: #665b70; /* 5.0:1 on the well */
+  --accent: #f7e4dc; /* hover wash */
+  --accent-foreground: #201a3a;
+  --destructive: #b3321f; /* 5.8:1 as text on a window */
+  --border: #201a3a33; /* hairline rules; structure uses --card-border */
+  --card-border: #201a3a; /* ink outline */
+  --card-border-hovered: #c84431; /* coral — 3.4:1 on the well */
+  --card-hovered: #fffaf3;
+  --input: #201a3a;
+  --field: #fffaf3;
+  --field-hovered: #fff4e7;
+  --ring: #c84431; /* coral focus — 4.0:1 on paper, 3.3:1 on the well */
+  --selected: #fde7c2;
+  --selected-foreground: #8a3a12; /* 6.2:1 on --selected */
+  --well: #f4dccb; /* sunken columns */
+  --window-coral: #f05b43; /* ink titles 5.0:1 */
+  --window-orange: #f79d47; /* 8.1:1 */
+  --window-lavender: #d9afc8; /* 9.0:1 */
+  --window-tan: #f2c28b; /* 10.4:1 */
+  /* Stage rules and dots: 3:1+ on paper and on the well. */
+  --stage-saved: #6e6475;
+  --stage-applied: #7e4596;
+  --stage-screening: #b5600f;
+  --stage-interview: #8f6c00;
+  --stage-offer: #2b737e;
+  --stage-accepted: #3a7a4f;
+  --stage-rejected: #b3321f;
+  /* Lozenges: a tint behind a dark text of the same hue, 4.5:1+. */
+  --lozenge-saved: #ece3ea;
+  --lozenge-saved-fg: #4f4657;
+  --lozenge-applied: #efdff5;
+  --lozenge-applied-fg: #6a3680;
+  --lozenge-screening: #fde0c4;
+  --lozenge-screening-fg: #874508;
+  --lozenge-interview: #f7e7a3;
+  --lozenge-interview-fg: #664d00;
+  --lozenge-offer: #d5eef0;
+  --lozenge-offer-fg: #1d5a63;
+  --lozenge-accepted: #d7eedb;
+  --lozenge-accepted-fg: #2a643c;
+  --lozenge-rejected: #fbd8d1;
+  --lozenge-rejected-fg: #962a1b;
   --chart-1: var(--stage-applied);
   --chart-2: var(--stage-screening);
   --chart-3: var(--stage-interview);
   --chart-4: var(--stage-offer);
   --chart-5: var(--stage-rejected);
-  /* elevation.shadow.raised / .overlay, flattened from ADS's layer objects. */
-  --elevation-raised: 0 1px 1px #1e1f2140, 0 0 1px #1e1f214f;
-  --elevation-overlay: 0 8px 12px #1e1f2126, 0 0 1px #1e1f214f;
-  --radius: 0.375rem; /* radius.medium */
-  --sidebar: #ffffff; /* elevation.surface */
-  --sidebar-foreground: #292a2e;
-  --sidebar-primary: #1868db;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f0f1f2; /* elevation.surface.hovered */
-  --sidebar-accent-foreground: #292a2e;
-  --sidebar-border: #0b120e24;
-  --sidebar-ring: #4688ec;
+  /* Hard offset shadows in ink, the signature of the boards. */
+  --elevation-raised: 3px 3px 0 #201a3a;
+  --elevation-overlay: 6px 6px 0 #201a3a;
+  --elevation-press: 1px 1px 0 #201a3a;
+  --speckle: #201a3a14;
+  --radius: 0rem;
+  --sidebar: #ebc8d7; /* lavender — ink 10.4:1 */
+  --sidebar-foreground: #201a3a;
+  --sidebar-primary: #a63426;
+  --sidebar-primary-foreground: #fffaf3;
+  --sidebar-accent: #f6dde7;
+  --sidebar-accent-foreground: #201a3a;
+  --sidebar-border: #201a3a;
+  --sidebar-ring: #a63426; /* 4.7:1 on lavender */
 }
 
 .dark {
-  --background: #18191a; /* elevation.surface.sunken */
-  --foreground: #cecfd2; /* color.text */
-  --surface: #1f1f21; /* elevation.surface */
-  --card: #242528; /* elevation.surface.raised */
-  --card-foreground: #cecfd2;
-  --popover: #2b2c2f; /* elevation.surface.overlay */
-  --popover-foreground: #cecfd2;
-  --primary: #669df1; /* color.background.brand.bold */
-  --primary-foreground: #1f1f21; /* color.text.inverse */
-  --secondary: #303134; /* color.background.accent.gray.subtlest */
-  --secondary-foreground: #cecfd2;
-  --muted: #303134;
-  --muted-foreground: #a9abaf; /* color.text.subtle — 6.66:1 on a card */
-  --subtlest: #96999e; /* color.text.subtlest — 5.36:1 on a card */
-  --accent: #303134; /* elevation.surface.overlay.hovered */
-  --accent-foreground: #cecfd2;
-  --destructive: #f87168; /* color.background.danger.bold */
-  --border: #e3e4f21f; /* color.border — translucent on purpose */
-  --card-border: #e3e4f266; /* 3.41:1 on the well, 3.65:1 on the sunken page */
-  --card-border-hovered: #e3e4f285; /* 4.92:1 on the hovered fill below */
-  --card-hovered: #2b2c2f; /* elevation.surface.overlay — lighter than the well */
-  --input: #7e8188; /* color.border.input — 3.93:1 against a card */
-  --field: #242528; /* color.background.input */
-  --field-hovered: #2b2c2f; /* color.background.input.hovered */
-  --ring: #8fb8f6; /* color.border.focused — 7.56:1 at full strength */
-  --selected: #1c2b42; /* color.background.selected */
-  --selected-foreground: #669df1; /* color.text.selected */
-  --well: #1f1f21;
-  --stage-saved: #96999e;
-  --stage-applied: #669df1;
-  --stage-screening: #c97cf4;
-  --stage-interview: #ddb30e;
-  --stage-offer: #6cc3e0;
-  --stage-accepted: #4bce97;
-  --stage-rejected: #f87168;
-  --lozenge-saved: #4b4d51;
-  /* The one deliberate departure from the extracted table. ADS pairs the dark
-     grey lozenge with color.text.accent.gray (#A9ABAF), which measures 3.68:1
-     here — short of the 4.5:1 an 11px label needs. This is its sibling one step
-     up the same published ramp, color.text.accent.gray.bolder, at 6.59:1. Every
-     other lozenge uses the unmodified pair. */
-  --lozenge-saved-fg: #e2e3e4;
-  --lozenge-applied: #123263;
-  --lozenge-applied-fg: #8fb8f6; /* 6.23:1 */
-  --lozenge-screening: #48245d;
-  --lozenge-screening-fg: #d8a0f7; /* 6.10:1 */
-  --lozenge-interview: #533f04;
-  --lozenge-interview-fg: #eed12b; /* 6.63:1 */
-  --lozenge-offer: #164555;
-  --lozenge-offer-fg: #9dd9ee; /* 6.74:1 */
-  --lozenge-accepted: #164b35;
-  --lozenge-accepted-fg: #7ee2b8; /* 6.43:1 */
-  --lozenge-rejected: #5d1f1a;
-  --lozenge-rejected-fg: #fd9891; /* 6.01:1 */
+  --background: #1a1530; /* ink desk at night */
+  --foreground: #fff4e7; /* 16.3:1 */
+  --surface: #241e3d;
+  --card: #2a2346; /* window — cream text 13.7:1 */
+  --card-foreground: #fff4e7;
+  --popover: #2a2346;
+  --popover-foreground: #fff4e7;
+  --primary: #ff8f78; /* light coral — 7.0:1 on the page, 5.9:1 on a window */
+  --primary-foreground: #201a3a;
+  --cta: #f2b755;
+  --cta-hovered: #f4c36f;
+  --cta-foreground: #201a3a;
+  --secondary: #352d55;
+  --secondary-foreground: #fff4e7;
+  --muted: #352d55;
+  --muted-foreground: #d4c9e0; /* 9.7:1 on a window */
+  --subtlest: #bfb2cf; /* 7.3:1 on the well */
+  --accent: #3a3160;
+  --accent-foreground: #fff4e7;
+  --destructive: #ff8f78;
+  --border: #fff4e72e;
+  --card-border: #f4dccb; /* cream outline — 12.6:1 on the page */
+  --card-border-hovered: #ff8f78;
+  --card-hovered: #2f2850;
+  --input: #cbbfd9; /* 9.6:1 against a field */
+  --field: #221c3b;
+  --field-hovered: #2a2346;
+  --ring: #f2b755; /* gold focus — 7.6:1 on a window */
+  --selected: #3a2c4f;
+  --selected-foreground: #ffd08a; /* 9.0:1 */
+  --well: #221c3b;
+  --window-coral: #f05b43;
+  --window-orange: #f79d47;
+  --window-lavender: #d9afc8;
+  --window-tan: #f2c28b;
+  --stage-saved: #b9adc8;
+  --stage-applied: #cfa0e6;
+  --stage-screening: #ffa65a;
+  --stage-interview: #f0cd52;
+  --stage-offer: #72cfdb;
+  --stage-accepted: #82d69e;
+  --stage-rejected: #ff8f78;
+  --lozenge-saved: #3a3350;
+  --lozenge-saved-fg: #e6deef;
+  --lozenge-applied: #45285a;
+  --lozenge-applied-fg: #e3c2f2;
+  --lozenge-screening: #57330f;
+  --lozenge-screening-fg: #ffc792;
+  --lozenge-interview: #4d3f05;
+  --lozenge-interview-fg: #f6dc7a;
+  --lozenge-offer: #123f47;
+  --lozenge-offer-fg: #a6e6ee;
+  --lozenge-accepted: #173f27;
+  --lozenge-accepted-fg: #a9e7bd;
+  --lozenge-rejected: #5a2119;
+  --lozenge-rejected-fg: #ffb3a3;
   --chart-1: var(--stage-applied);
   --chart-2: var(--stage-screening);
   --chart-3: var(--stage-interview);
   --chart-4: var(--stage-offer);
   --chart-5: var(--stage-rejected);
-  --elevation-raised: 0 1px 1px #0104043b, 0 0 1px #0104043b;
-  --elevation-overlay: 0 0 0 1px #bdbdbd1f, 0 8px 12px #0104042a,
-    0 0 1px 1px #0104043b;
-  --sidebar: #1f1f21;
-  --sidebar-foreground: #cecfd2;
-  --sidebar-primary: #669df1;
-  --sidebar-primary-foreground: #1f1f21;
-  --sidebar-accent: #303134;
-  --sidebar-accent-foreground: #cecfd2;
-  --sidebar-border: #e3e4f21f;
-  --sidebar-ring: #8fb8f6;
+  /* Shadows go darker than the desk so windows still lift off it. */
+  --elevation-raised: 3px 3px 0 #0b0818;
+  --elevation-overlay: 6px 6px 0 #0b0818;
+  --elevation-press: 1px 1px 0 #0b0818;
+  --speckle: #fff4e70f;
+  --sidebar: #2b2148;
+  --sidebar-foreground: #fff4e7;
+  --sidebar-primary: #ff8f78;
+  --sidebar-primary-foreground: #201a3a;
+  --sidebar-accent: #3a2d5c;
+  --sidebar-accent-foreground: #fff4e7;
+  --sidebar-border: #f4dccb;
+  --sidebar-ring: #f2b755;
 }
 
 @layer base {
   /* Tells the browser which way to render the controls it draws itself — the
-     date field's calendar glyph and spinners, and the scrollbars. Without it
-     they stay light-mode and the date picker in the application sheet is a
-     near-black icon on a near-black field. */
+     date field's calendar glyph and spinners, and the scrollbars. */
   :root {
     color-scheme: light;
   }
@@ -279,26 +292,53 @@
     color-scheme: dark;
   }
   * {
-    /* Solid, not `outline-ring/75`. The ring was translucent because the old
-       indigo ring was too dark at full strength; ADS's color.border.focused is
-       tuned to be used neat, and at 75% over the new light surfaces it measures
-       2.29–2.49:1 — under the 3:1 SC 1.4.11 wants. Neat it is 3.10–3.50:1
-       light and 7.56:1 dark. */
+    /* A solid ring: the focus colours above are tuned to be used neat. */
     @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
+    /* The boards' speckled paper: two sparse dot layers, too faint to touch
+       text contrast. */
+    background-image:
+      radial-gradient(var(--speckle) 1px, transparent 1.2px),
+      radial-gradient(var(--speckle) 0.8px, transparent 1px);
+    background-size: 23px 23px, 37px 37px;
+    background-position: 0 0, 11px 17px;
   }
   html {
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
-  h1,
+  h1 {
+    @apply font-heading font-normal tracking-[0.01em];
+  }
   h2,
   h3 {
     @apply tracking-tight;
   }
+  ::selection {
+    background-color: var(--cta);
+    color: var(--cta-foreground);
+  }
+}
+
+/* A window's title bar: a coloured strip with an ink rule under it. */
+@utility window-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--card-border);
+  padding: 0.375rem 0.625rem;
+  color: #201a3a;
+}
+
+/* The small typewriter label used above headings and on tags. */
+@utility eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 /* A horizontal scroller whose overflow has to be discoverable: macOS draws
@@ -307,15 +347,15 @@
    for a styled scrollbar opts the element out of overlay scrollbars entirely,
    and the rail stays on screen. */
 .scroll-rail::-webkit-scrollbar {
-  height: 8px;
-  width: 8px;
+  height: 10px;
+  width: 10px;
 }
 .scroll-rail::-webkit-scrollbar-track {
   background-color: transparent;
 }
 .scroll-rail::-webkit-scrollbar-thumb {
-  background-color: var(--muted);
-  border-radius: 9999px;
+  background-color: var(--window-orange);
+  border: 2px solid var(--card-border);
 }
 /* Chromium ignores ::-webkit-scrollbar entirely once scrollbar-width or
    scrollbar-color is set, so the standard properties are scoped to the engines
@@ -323,7 +363,7 @@
 @supports not selector(::-webkit-scrollbar) {
   .scroll-rail {
     scrollbar-width: thin;
-    scrollbar-color: var(--muted) transparent;
+    scrollbar-color: var(--window-orange) transparent;
   }
 }
 

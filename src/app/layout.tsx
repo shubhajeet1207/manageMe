@@ -1,17 +1,31 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Lilita_One, Space_Mono } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
-// Atlassian Sans is proprietary, so Jira's typography is reproduced with Inter —
-// the same grotesque-with-a-tall-x-height brief, and the closest freely
-// licensable face to it. ADS's own font.family.body fallback stack sits behind
-// it in globals.css, so a failed font fetch still lands on the stack Atlassian
-// would have fallen back to.
+// The retro desktop theme (see globals.css). Body text is Trebuchet first, as
+// in SpyMonk, with Inter as the cross-platform fallback; @font-face files are
+// only fetched when a fallback is actually used.
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
+})
+
+// The chunky lettering of the mood boards' title bars and buttons.
+const lilita = Lilita_One({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-lilita",
+  display: "swap",
+})
+
+// Typewriter labels: eyebrows, table headings, tags.
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-space-mono",
   display: "swap",
 })
 
@@ -26,7 +40,11 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${inter.variable} ${lilita.variable} ${spaceMono.variable}`}
+      suppressHydrationWarning
+    >
       <body>
         <ThemeProvider
           attribute="class"

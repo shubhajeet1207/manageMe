@@ -1,3 +1,6 @@
+import { createHmac } from "node:crypto"
+import { logEvent } from "@/lib/observability/logger"
+
 /**
  * Rate limiting for the unauthenticated auth actions.
  *
@@ -144,10 +147,10 @@ export function createInProcessRateLimiter(
 const LOGIN_BURST = 10
 const LOGIN_REFILL_INTERVAL_MS = 30_000
 
-export const loginRateLimiter: RateLimiter = createInProcessRateLimiter({
+export const loginRateLimiter: RateLimiter = createConfiguredRateLimiter({
   burst: LOGIN_BURST,
   refillIntervalMs: LOGIN_REFILL_INTERVAL_MS,
-})
+}, "login")
 
 /**
  * Signup: five attempts, then one every five minutes.
@@ -161,10 +164,95 @@ export const loginRateLimiter: RateLimiter = createInProcessRateLimiter({
 const SIGNUP_BURST = 5
 const SIGNUP_REFILL_INTERVAL_MS = 5 * 60_000
 
-export const signupRateLimiter: RateLimiter = createInProcessRateLimiter({
+export const signupRateLimiter: RateLimiter = createConfiguredRateLimiter({
   burst: SIGNUP_BURST,
   refillIntervalMs: SIGNUP_REFILL_INTERVAL_MS,
-})
+}, "signup")
+
+const CONSUME_SCRIPT = `
+local time = redis.call('TIME')
+local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
+local burst = tonumber(ARGV[1])
+local interval = tonumber(ARGV[2])
+local state = redis.call('HMGET', KEYS[1], 'tokens', 'at')
+local tokens = tonumber(state[1]) or burst
+local at = tonumber(state[2]) or now
+tokens = math.min(burst, tokens + math.max(0, now-at) / interval)
+local allowed = 0
+local retry = math.ceil((1-tokens)*interval)
+if tokens >= 1 then tokens = tokens-1; allowed = 1; retry = 0 end
+redis.call('HSET', KEYS[1], 'tokens', tostring(tokens), 'at', tostring(now))
+redis.call('PEXPIRE', KEYS[1], math.ceil(burst * interval))
+return {allowed, math.floor(tokens), retry}
+`
+
+export interface RedisRateLimiterOptions extends InProcessRateLimiterOptions {
+  url: string
+  token: string
+  namespace: string
+  hashKey: string
+  fetcher?: typeof fetch
+}
+
+/** One Lua execution spends and refills atomically using the Redis server clock. */
+export function createRedisRateLimiter(options: RedisRateLimiterOptions): RateLimiter {
+  const endpoint = new URL(options.url)
+  if (endpoint.protocol !== "https:" || endpoint.username || endpoint.password) throw new Error("Redis REST requires an HTTPS endpoint")
+  const fetcher = options.fetcher ?? fetch
+  const keyFor = (key: string) => `manageme:rate:${options.namespace}:${createHmac("sha256", options.hashKey).update(key).digest("hex")}`
+  async function command(args: Array<string | number>): Promise<unknown> {
+    const response = await fetcher(endpoint, {
+      method: "POST", cache: "no-store", signal: AbortSignal.timeout(2500),
+      headers: { Authorization: `Bearer ${options.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+    })
+    if (!response.ok) throw new Error("Redis request failed")
+    const data = await response.json() as { result?: unknown; error?: unknown }
+    if (data.error) throw new Error("Redis command failed")
+    return data.result
+  }
+  return {
+    async consume(key) {
+      const result = await command(["EVAL", CONSUME_SCRIPT, 1, keyFor(key), options.burst, options.refillIntervalMs])
+      if (!Array.isArray(result) || result.length !== 3 || result.some((n) => typeof n !== "number" || !Number.isFinite(n))) throw new Error("Invalid Redis limiter response")
+      return result[0] === 1 ? { allowed: true, remaining: Math.max(0, result[1]) } : { allowed: false, retryAfterMs: Math.max(1, result[2]) }
+    },
+    async reset(key) { await command(["DEL", keyFor(key)]) },
+  }
+}
+
+/** Production never silently falls back to per-process limits. */
+export function createConfiguredRateLimiter(options: InProcessRateLimiterOptions, namespace: string): RateLimiter {
+  const local = createInProcessRateLimiter(options)
+  let distributed: RateLimiter | undefined
+  let lastWarning = 0
+  function backend(): RateLimiter {
+    if (distributed) return distributed
+    const url = process.env.UPSTASH_REDIS_REST_URL
+    const token = process.env.UPSTASH_REDIS_REST_TOKEN
+    if (url && token) {
+      distributed = createRedisRateLimiter({ ...options, namespace, url, token, hashKey: process.env.RATE_LIMIT_HASH_KEY ?? process.env.AUTH_SECRET ?? token })
+      return distributed
+    }
+    if (process.env.NODE_ENV === "production") throw new Error("Distributed rate limiting is not configured")
+    return local
+  }
+  function unavailable() {
+    if (Date.now() - lastWarning > 60_000) {
+      logEvent("error", "rate_limit.unavailable", { namespace })
+      lastWarning = Date.now()
+    }
+  }
+  return {
+    async consume(key) {
+      try { return await backend().consume(key) }
+      catch { unavailable(); return { allowed: false, retryAfterMs: 30_000 } }
+    },
+    async reset(key) {
+      try { await backend().reset(key) } catch { unavailable() }
+    },
+  }
+}
 
 /**
  * The longest a key's value may be before it is truncated.
